@@ -52,6 +52,7 @@ def transform_transat_package(transat_pkg: dict) -> dict:
         'url': hotel.get('url'),
         'drinks24h': hotel.get('drinks24h') == 1,
         'snacks24h': hotel.get('snacks24h') == 1,
+        'adult_only': hotel.get('adultOnly', 0),
         'amenities': amenities,
         'price': float(price),
         'dates': {

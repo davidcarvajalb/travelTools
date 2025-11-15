@@ -75,6 +75,7 @@ def transform_to_web_format(
             google_maps_url=hotel.get("google_maps_url"),
             drinks24h=hotel.get("drinks24h", False),
             snacks24h=hotel.get("snacks24h", False),
+            adult_only=hotel.get("adult_only"),
             departure_date=hotel.get("departure_date"),
             return_date=hotel.get("return_date"),
             price_range=hotel["price_range"],

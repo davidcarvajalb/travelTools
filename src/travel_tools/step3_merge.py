@@ -58,6 +58,8 @@ def merge_data(
         air_transat_url = next((pkg.url for pkg in packages if pkg.url), None)
         drinks24h = any(pkg.drinks24h for pkg in packages)
         snacks24h = any(pkg.snacks24h for pkg in packages)
+        adult_values = [pkg.adult_only for pkg in packages if pkg.adult_only is not None]
+        adult_only = adult_values[0] if adult_values else None
         departure_date = (
             min(pkg.dates.departure for pkg in packages).isoformat()
             if packages
@@ -81,6 +83,7 @@ def merge_data(
             google_maps_url=google_maps_url,
             drinks24h=drinks24h,
             snacks24h=snacks24h,
+            adult_only=adult_only,
             departure_date=departure_date,
             return_date=return_date,
             source=source,

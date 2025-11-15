@@ -48,3 +48,4 @@ def test_adds_urls_and_flags(sample_packages, sample_ratings):
     assert dreams["google_maps_url"].startswith("https://www.google.com/maps/search/")
     assert dreams["drinks24h"] is True
     assert dreams["snacks24h"] is True
+    assert dreams["adult_only"] == 1
