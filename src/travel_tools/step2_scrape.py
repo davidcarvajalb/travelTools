@@ -13,7 +13,7 @@ from playwright.sync_api import (
 from rich.progress import track
 from tenacity import retry, stop_after_attempt, wait_fixed
 
-from .types import GoogleRating
+from .types import GoogleRating, Review
 from .utils.file_ops import load_json, save_json
 from .utils.logger import console
 from .utils.validators import validate_file_exists
@@ -32,12 +32,237 @@ def extract_unique_hotels(packages: list[dict]) -> list[str]:
     return sorted(hotels)
 
 
-def scrape_hotel(hotel_name: str, page: Page, debug: bool = False) -> GoogleRating:
+def scrape_reviews(hotel_name: str, page: Page, max_reviews: int = 10, debug: bool = False, debug_dir: Path | None = None) -> list[Review]:
+    """Scrape reviews from Google Maps for a hotel.
+
+    Args:
+        hotel_name: Name of the hotel
+        page: Playwright page instance
+        max_reviews: Maximum number of reviews to scrape
+        debug: Enable debug logging
+        debug_dir: Directory to save debug artifacts
+
+    Returns:
+        List of Review objects
+    """
+    safe_name = hotel_name.replace(' ', '_').replace('/', '_')
+
+    try:
+        if debug:
+            console.print(f"\n[cyan]{'='*60}[/cyan]")
+            console.print(f"[cyan]Starting review scrape for: {hotel_name}[/cyan]")
+            console.print(f"[cyan]{'='*60}[/cyan]")
+
+        # Save initial page state
+        if debug and debug_dir:
+            initial_html = debug_dir / f"{safe_name}_01_initial.html"
+            initial_screenshot = debug_dir / f"{safe_name}_01_initial.png"
+            with open(initial_html, 'w') as f:
+                f.write(page.content())
+            page.screenshot(path=str(initial_screenshot))
+            console.print(f"[blue]📸 Saved initial state:[/blue] {initial_screenshot}")
+
+        # Click on Reviews tab/button
+        if debug:
+            console.print(f"[yellow]Step 1: Looking for Reviews tab...[/yellow]")
+
+        reviews_tab_clicked = False
+        try:
+            page.click('button[aria-label*="Reviews"]', timeout=5000)
+            reviews_tab_clicked = True
+            if debug:
+                console.print(f"[green]✓ Clicked Reviews tab (aria-label selector)[/green]")
+        except Exception as e1:
+            if debug:
+                console.print(f"[yellow]  First selector failed: {e1}[/yellow]")
+            # Try alternative selector
+            try:
+                page.click('button:has-text("Reviews")', timeout=5000)
+                reviews_tab_clicked = True
+                if debug:
+                    console.print(f"[green]✓ Clicked Reviews tab (text selector)[/green]")
+            except Exception as e2:
+                if debug:
+                    console.print(f"[red]✗ Could not find Reviews tab: {e2}[/red]")
+                    if debug_dir:
+                        fail_html = debug_dir / f"{safe_name}_02_no_reviews_tab.html"
+                        with open(fail_html, 'w') as f:
+                            f.write(page.content())
+                        console.print(f"[blue]📄 Saved HTML for inspection: {fail_html}[/blue]")
+                return []
+
+        page.wait_for_timeout(2000)  # Wait for reviews to load
+
+        if debug and debug_dir and reviews_tab_clicked:
+            after_click_html = debug_dir / f"{safe_name}_02_after_reviews_click.html"
+            after_click_screenshot = debug_dir / f"{safe_name}_02_after_reviews_click.png"
+            with open(after_click_html, 'w') as f:
+                f.write(page.content())
+            page.screenshot(path=str(after_click_screenshot))
+            console.print(f"[blue]📸 Saved after Reviews click:[/blue] {after_click_screenshot}")
+
+        # Scroll to load more reviews
+        if debug:
+            console.print(f"[yellow]Step 2: Scrolling to load reviews...[/yellow]")
+
+        try:
+            reviews_container = page.locator('div[role="feed"]').first
+            scroll_count = max_reviews // 5 + 1
+            if debug:
+                console.print(f"[blue]  Scrolling {scroll_count} times...[/blue]")
+            for i in range(scroll_count):
+                reviews_container.evaluate('el => el.scrollBy(0, 500)')
+                page.wait_for_timeout(500)
+                if debug and i % 2 == 0:
+                    console.print(f"[blue]  Scroll {i+1}/{scroll_count}...[/blue]")
+            if debug:
+                console.print(f"[green]✓ Scrolling complete[/green]")
+        except Exception as e:
+            if debug:
+                console.print(f"[yellow]⚠ Could not scroll reviews: {e}[/yellow]")
+                console.print(f"[yellow]  Continuing with available reviews...[/yellow]")
+
+        # Extract review elements
+        if debug:
+            console.print(f"[yellow]Step 3: Extracting review elements...[/yellow]")
+
+        review_elements = page.locator('div[data-review-id]').all()
+
+        if debug:
+            console.print(f"[blue]Found {len(review_elements)} review elements[/blue]")
+
+            # Save HTML after scrolling
+            if debug_dir:
+                after_scroll_html = debug_dir / f"{safe_name}_03_after_scroll.html"
+                with open(after_scroll_html, 'w') as f:
+                    f.write(page.content())
+                console.print(f"[blue]📄 Saved HTML with reviews: {after_scroll_html}[/blue]")
+
+        reviews = []
+        for idx, review_elem in enumerate(review_elements[:max_reviews]):
+            if debug:
+                console.print(f"\n[cyan]Processing review {idx+1}/{min(len(review_elements), max_reviews)}...[/cyan]")
+
+            try:
+                # Extract review text
+                try:
+                    text_elem = review_elem.locator('span.wiI7pd').first
+                    text = text_elem.text_content(timeout=3000) or ""
+                    if debug:
+                        console.print(f"  Text: {text[:50]}..." if len(text) > 50 else f"  Text: {text}")
+                except Exception as e:
+                    if debug:
+                        console.print(f"  [red]✗ Failed to get text: {e}[/red]")
+                    text = ""
+
+                # Expand "More" button if present
+                try:
+                    more_button = review_elem.locator('button.w8nwRe').first
+                    if more_button.is_visible(timeout=500):
+                        more_button.click()
+                        page.wait_for_timeout(300)
+                        text = text_elem.text_content() or text
+                        if debug:
+                            console.print(f"  [green]✓ Expanded 'More' button[/green]")
+                except Exception:
+                    pass  # No "More" button or already expanded
+
+                # Extract star rating
+                try:
+                    rating_elem = review_elem.locator('span[role="img"][aria-label*="stars"]').first
+                    rating_text = rating_elem.get_attribute("aria-label", timeout=3000) or rating_elem.text_content(timeout=3000) or ""
+                    rating = int(float(rating_text.split()[0])) if rating_text else 3
+                    if debug:
+                        console.print(f"  Rating: {rating} stars (from '{rating_text}')")
+                except Exception as e:
+                    if debug:
+                        console.print(f"  [yellow]⚠ Failed to get rating (defaulting to 3): {e}[/yellow]")
+                    rating = 3
+
+                # Extract date
+                try:
+                    # Try two possible date selectors
+                    date_elem = review_elem.locator('span.DZSIDd, span.xRkPPb').first
+                    date_text = date_elem.text_content(timeout=3000) or "Unknown"
+                    # Clean up text like "a week ago on Google" → "a week ago"
+                    date = date_text.split(" on ")[0] if " on " in date_text else date_text
+                    if debug:
+                        console.print(f"  Date: {date}")
+                except Exception as e:
+                    if debug:
+                        console.print(f"  [yellow]⚠ Failed to get date: {e}[/yellow]")
+                    date = "Unknown"
+
+                # Extract reviewer name
+                try:
+                    # Try to find reviewer name in the div with class d4r55
+                    name_elem = review_elem.locator('div.d4r55').first
+                    reviewer_name = name_elem.text_content(timeout=3000) or ""
+                    reviewer_name = reviewer_name.strip() if reviewer_name else None
+                    if debug:
+                        console.print(f"  Reviewer: {reviewer_name}")
+                except Exception as e:
+                    if debug:
+                        console.print(f"  [yellow]⚠ Failed to get reviewer name: {e}[/yellow]")
+                    reviewer_name = None
+
+                if not text or len(text) < 5:
+                    if debug:
+                        console.print(f"  [yellow]⚠ Skipping review with insufficient text[/yellow]")
+                    continue
+
+                review = Review(
+                    text=text,
+                    rating=rating,
+                    date=date,
+                    reviewer_name=reviewer_name
+                )
+                reviews.append(review)
+
+                if debug:
+                    console.print(f"  [green]✓ Successfully parsed review {idx+1}[/green]")
+
+            except Exception as e:
+                if debug:
+                    console.print(f"  [red]✗ Failed to parse review: {e}[/red]")
+                continue
+
+        if debug:
+            console.print(f"\n[cyan]{'='*60}[/cyan]")
+            console.print(f"[green]✓ Scraped {len(reviews)}/{len(review_elements[:max_reviews])} reviews for {hotel_name}[/green]")
+            console.print(f"[cyan]{'='*60}[/cyan]\n")
+
+        # Save final results
+        if debug and debug_dir:
+            reviews_json = debug_dir / f"{safe_name}_04_reviews.json"
+            with open(reviews_json, 'w') as f:
+                import json
+                json.dump([r.model_dump() for r in reviews], f, indent=2)
+            console.print(f"[blue]💾 Saved reviews JSON: {reviews_json}[/blue]")
+
+        return reviews
+
+    except PlaywrightTimeoutError as e:
+        if debug:
+            console.print(f"[red]✗ Timeout scraping reviews for {hotel_name}: {e}[/red]")
+        return []
+    except Exception as e:
+        if debug:
+            console.print(f"[red]✗ Error scraping reviews for {hotel_name}: {e}[/red]")
+            import traceback
+            console.print(f"[red]{traceback.format_exc()}[/red]")
+        return []
+
+
+def scrape_hotel(hotel_name: str, page: Page, max_reviews: int = 0, debug: bool = False, debug_dir: Path | None = None) -> GoogleRating:
     """Scrape Google Maps for a single hotel.
 
     Args:
         hotel_name: Name of the hotel
         page: Playwright page instance
+        max_reviews: Maximum number of reviews to scrape (0 = skip reviews)
+        debug: Enable debug logging
+        debug_dir: Directory to save debug artifacts
 
     Returns:
         GoogleRating object with scraped data
@@ -79,10 +304,18 @@ def scrape_hotel(hotel_name: str, page: Page, debug: bool = False) -> GoogleRati
         except Exception:
             pass
 
+        # Scrape reviews if requested
+        reviews = []
+        if max_reviews > 0:
+            reviews = scrape_reviews(hotel_name, page, max_reviews=max_reviews, debug=debug, debug_dir=debug_dir)
+            if debug:
+                console.print(f"[blue]Scraped {len(reviews)} reviews for {hotel_name}[/blue]")
+
         return GoogleRating(
             hotel_name=hotel_name,
             rating=rating,
             review_count=review_count,
+            reviews=reviews,
         )
 
     except PlaywrightTimeoutError:
@@ -94,9 +327,9 @@ def scrape_hotel(hotel_name: str, page: Page, debug: bool = False) -> GoogleRati
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
-def scrape_with_retry(hotel_name: str, page: Page, debug: bool = False) -> GoogleRating:
+def scrape_with_retry(hotel_name: str, page: Page, max_reviews: int = 0, debug: bool = False, debug_dir: Path | None = None) -> GoogleRating:
     """Scrape hotel with retry logic."""
-    return scrape_hotel(hotel_name, page, debug=debug)
+    return scrape_hotel(hotel_name, page, max_reviews=max_reviews, debug=debug, debug_dir=debug_dir)
 
 
 @click.command()
@@ -109,7 +342,19 @@ def scrape_with_retry(hotel_name: str, page: Page, debug: bool = False) -> Googl
     default=False,
     help="Capture Playwright traces and screenshots for debugging",
 )
-def main(destination: str, source: str, headless: bool, debug: bool) -> None:
+@click.option(
+    "--max-reviews",
+    default=0,
+    type=int,
+    help="Maximum number of reviews to scrape per hotel (0 = skip reviews)",
+)
+@click.option(
+    "--test-single-hotel",
+    is_flag=True,
+    default=False,
+    help="Only scrape the first hotel (for testing)",
+)
+def main(destination: str, source: str, headless: bool, debug: bool, max_reviews: int, test_single_hotel: bool) -> None:
     """Scrape Google Maps ratings for hotels."""
     # Find most recent filtered file
     filtered_dir = Path(f"data/{destination}/{source}/filtered")
@@ -126,7 +371,14 @@ def main(destination: str, source: str, headless: bool, debug: bool) -> None:
         packages = load_json(filtered_file)
         hotels = extract_unique_hotels(packages)
 
+        # Limit to single hotel for testing if requested
+        if test_single_hotel:
+            hotels = hotels[:1]
+            console.print(f"[yellow]Test mode: Only scraping first hotel[/yellow]")
+
         console.print(f"[blue]Found {len(hotels)} unique hotels to scrape[/blue]")
+        if max_reviews > 0:
+            console.print(f"[blue]Will scrape up to {max_reviews} reviews per hotel[/blue]")
 
         scrape_dir = Path(f"data/{destination}/{source}/scraped")
         scrape_dir.mkdir(parents=True, exist_ok=True)
@@ -152,16 +404,16 @@ def main(destination: str, source: str, headless: bool, debug: bool) -> None:
             ratings = []
             for hotel in track(hotels, description="Scraping hotels"):
                 try:
-                    rating = scrape_with_retry(hotel, page, debug=debug)
+                    rating = scrape_with_retry(hotel, page, max_reviews=max_reviews, debug=debug, debug_dir=debug_dir if debug else None)
                     ratings.append(rating.model_dump())
                 except Exception as e:
                     console.print(f"[red]Failed to scrape {hotel}:[/red] {e}")
                     ratings.append(GoogleRating(hotel_name=hotel).model_dump())
                     if debug:
-                        screenshot_path = debug_dir / f"{hotel.replace(' ', '_')}.png"
+                        screenshot_path = debug_dir / f"{hotel.replace(' ', '_')}_error.png"
                         page.screenshot(path=str(screenshot_path), full_page=True)
                         console.print(
-                            f"[yellow]Captured screenshot for {hotel} at {screenshot_path}[/yellow]"
+                            f"[yellow]Captured error screenshot for {hotel} at {screenshot_path}[/yellow]"
                         )
 
             if debug and trace_path:

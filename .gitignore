@@ -48,6 +48,10 @@ data/*/
 outputs/*/
 *.log
 
+# Environment variables
+.env
+.env.fish
+
 # Keep structure
 !data/.gitkeep
 !outputs/.gitkeep

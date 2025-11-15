@@ -65,6 +65,24 @@ case $COMMAND in
         --headless "$HEADLESS"
     ;;
 
+  summarize)
+    DEST=${1:-cancun}
+    SOURCE=${2:-transat}
+    echo "🤖 Running Step 2.5: AI Summarize ($DEST/$SOURCE)"
+    # Pass through GEMINI_API_KEY if set
+    ENV_ARGS=""
+    if [ -n "$GEMINI_API_KEY" ]; then
+      ENV_ARGS="-e GEMINI_API_KEY=$GEMINI_API_KEY"
+    fi
+    podman run --rm \
+      -v ./data:/app/data:Z \
+      $ENV_ARGS \
+      traveltools:latest \
+      python -m travel_tools.step2_5_summarize \
+        --destination "$DEST" \
+        --source "$SOURCE"
+    ;;
+
   merge)
     DEST=${1:-cancun}
     SOURCE=${2:-transat}
@@ -104,9 +122,15 @@ case $COMMAND in
 
   shell)
     echo "🐚 Opening shell in container"
+    # Pass through GEMINI_API_KEY if set
+    ENV_ARGS=""
+    if [ -n "$GEMINI_API_KEY" ]; then
+      ENV_ARGS="-e GEMINI_API_KEY=$GEMINI_API_KEY"
+    fi
     podman run -it --rm \
       -v ./data:/app/data:Z \
       -v ./outputs:/app/outputs:Z \
+      $ENV_ARGS \
       traveltools:latest \
       /bin/bash
     ;;
@@ -127,6 +151,7 @@ case $COMMAND in
     echo "  test [args]          Run tests (pass pytest args)"
     echo "  filter <dest> <src> <budget>   Run step 1: Filter"
     echo "  scrape <dest> <src>            Run step 2: Scrape"
+    echo "  summarize <dest> <src>         Run step 2.5: AI Summarize"
     echo "  merge <dest> <src>             Run step 3: Merge"
     echo "  web <dest> <src>               Run step 4: Generate web"
     echo "  serve [port]         Start web server (default: 8080)"
@@ -137,6 +162,7 @@ case $COMMAND in
     echo "  $0 pipeline                          # Interactive launcher"
     echo "  $0 filter cancun transat 5000       # Filter packages"
     echo "  $0 scrape cancun transat            # Scrape ratings"
+    echo "  export GEMINI_API_KEY=xyz && $0 summarize cancun transat  # AI summarize"
     echo "  $0 serve 8080                       # View outputs"
     echo "  $0 test                             # Run all tests"
     echo "  $0 dev                              # Development shell"

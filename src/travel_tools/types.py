@@ -33,12 +33,34 @@ class HotelPackage(BaseModel):
 
 
 # Step 2: Scraped data
+class Review(BaseModel):
+    """Individual Google Maps review."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    text: str = Field(..., min_length=1, description="Review text content")
+    rating: int = Field(..., ge=1, le=5, description="Star rating 1-5")
+    date: str = Field(..., description="Review date (YYYY-MM-DD or relative like '2 weeks ago')")
+    reviewer_name: str | None = Field(None, description="Name of reviewer")
+
+
+class ReviewSummary(BaseModel):
+    """AI-generated review summary."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    good_points: list[str] = Field(default_factory=list, description="Positive highlights")
+    bad_points: list[str] = Field(default_factory=list, description="Negative aspects")
+    ugly_points: list[str] = Field(default_factory=list, description="Deal-breakers")
+    overall_summary: str = Field(..., min_length=1, description="Overall summary text")
+    review_count_analyzed: int = Field(..., ge=0, description="Number of reviews analyzed")
+
+
 class GoogleRating(BaseModel):
     """Google Maps rating data."""
 
     hotel_name: str
     rating: float | None = None
     review_count: int | None = None
+    reviews: list[Review] = Field(default_factory=list, description="Scraped reviews")
 
 
 # Step 3: Merged output
@@ -68,6 +90,7 @@ class HotelData(BaseModel):
     source: str  # 'transat', 'expedia', etc.
     price_range: PriceRange
     packages: list[HotelPackage]
+    review_summary: ReviewSummary | None = Field(None, description="AI-generated review summary")
 
 
 # Step 4: Web output format
@@ -103,6 +126,7 @@ class WebHotel(BaseModel):
     price_range: PriceRange
     package_count: int
     packages: list[WebPackage]
+    review_summary: ReviewSummary | None = Field(None, description="AI-generated review summary")
 
 
 class WebMetadata(BaseModel):

@@ -8,7 +8,9 @@ dependencies = [
     "pydantic>=2.5.0",
     "click>=8.1.7",
     "rich>=13.7.0",
-    "tenacity>=8.2.3"
+    "tenacity>=8.2.3",
+    "google-generativeai>=0.3.0",
+    "python-dotenv>=1.0.0"
 ]
 
 [project.optional-dependencies]
@@ -26,6 +28,7 @@ dev = [
 travel-tools = "travel_tools.launcher:main"
 tt-filter = "travel_tools.step1_filter:main"
 tt-scrape = "travel_tools.step2_scrape:main"
+tt-summarize = "travel_tools.step2_5_summarize:main"
 tt-merge = "travel_tools.step3_merge:main"
 tt-generate-web = "travel_tools.step4_generate_web:main"
 
