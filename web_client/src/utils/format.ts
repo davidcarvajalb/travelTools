@@ -1,6 +1,6 @@
-const currency = new Intl.NumberFormat("en-US", {
+const currency = new Intl.NumberFormat("en-CA", {
   style: "currency",
-  currency: "USD",
+  currency: "CAD",
   maximumFractionDigits: 0
 });
 
@@ -29,9 +29,18 @@ export function formatDate(value: string): string {
   if (!value) {
     return "Unknown date";
   }
-  return value;
+  return value.length > 10 ? value.slice(0, 10) : value;
 }
 
 export function formatBinary(value: boolean | null | undefined): string {
   return value ? "Yes" : "No";
+}
+
+export function formatAdultOnly(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  const numeric = value;
+  if (Number.isNaN(numeric)) return "—";
+  if (numeric === 0) return "No";
+  if (numeric === 1) return "Yes";
+  return "Maybe";
 }

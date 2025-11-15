@@ -72,5 +72,5 @@ def test_includes_links_and_flags(sample_packages, sample_ratings):
     assert dreams["google_maps_url"].startswith("https://www.google.com/maps/search/")
     assert dreams["drinks24h"] is True
     assert dreams["snacks24h"] is True
-    assert dreams["departure_date"] == "2025-02-15T00:00:00"
+    assert dreams["adult_only"] == 1
     assert dreams["packages"][0]["url"] == "https://example.com/dreams"

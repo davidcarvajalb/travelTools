@@ -26,6 +26,7 @@ export interface WebHotel {
   google_maps_url?: string | null;
   drinks24h: boolean;
   snacks24h: boolean;
+  adult_only?: number | null;
   departure_date?: string | null;
   return_date?: string | null;
   price_range: PriceRange;

@@ -75,7 +75,7 @@
     data-test="filters-card"
   >
     <h2>Filters</h2>
-    <div class="filters-grid">
+    <div class="filters-grid filters-grid--form">
       <div>
         <label for="search">Search hotel name</label>
         <input
@@ -101,44 +101,48 @@
         </select>
       </div>
       <div>
-        <label>Price range (USD)</label>
-        <div class="filters-grid">
-          <input
-            type="number"
-            v-model.number="filters.price.min"
-            data-test="price-min"
-            :disabled="loading || !hasFiltersEnabled"
-            @blur="normalizePriceRange"
-          />
-          <input
-            type="number"
-            v-model.number="filters.price.max"
-            data-test="price-max"
-            :disabled="loading || !hasFiltersEnabled"
-            @blur="normalizePriceRange"
-          />
-        </div>
-        <small>
-          Min: {{ formatCurrency(priceBounds.min) }} · Max: {{ formatCurrency(priceBounds.max) }}
-        </small>
+        <label for="price-min">Price min (CAD)</label>
+        <input
+          id="price-min"
+          type="number"
+          v-model.number="filters.price.min"
+          data-test="price-min"
+          :disabled="loading || !hasFiltersEnabled"
+          @blur="normalizePriceRange"
+        />
       </div>
       <div>
-        <label>Stars</label>
-        <div class="chips">
-          <button
-            v-for="star in availableStars"
-            :key="star"
-            type="button"
-            class="chip"
-            :class="{ active: filters.stars.includes(star) }"
-            @click="toggleStar(star)"
-            :disabled="loading || !hasFiltersEnabled"
-          >
-            {{ star }}★
-          </button>
-        </div>
+        <label for="price-max">Price max (CAD)</label>
+        <input
+          id="price-max"
+          type="number"
+          v-model.number="filters.price.max"
+          data-test="price-max"
+          :disabled="loading || !hasFiltersEnabled"
+          @blur="normalizePriceRange"
+        />
       </div>
     </div>
+    <div class="chips-row">
+      <label>Stars</label>
+      <div class="chips">
+        <button
+          v-for="star in availableStars"
+          :key="star"
+          type="button"
+          class="chip"
+          :class="{ active: filters.stars.includes(star) }"
+          @click="toggleStar(star)"
+          :disabled="loading || !hasFiltersEnabled"
+        >
+          {{ star }}★
+        </button>
+      </div>
+    </div>
+    <p class="filters-note">
+      Prices shown in CAD · Available range: {{ formatCurrency(priceBounds.min) }} —
+      {{ formatCurrency(priceBounds.max) }}
+    </p>
     <div class="filters-actions">
       <button
         class="secondary"
@@ -162,13 +166,11 @@
             <th @click="changeSort('stars')" data-test="sort-stars">Stars</th>
             <th @click="changeSort('rating')" data-test="sort-rating">Rating</th>
             <th @click="changeSort('reviews')" data-test="sort-reviews">Reviews</th>
-            <th @click="changeSort('price')" data-test="sort-price">Price Range</th>
+            <th @click="changeSort('price')" data-test="sort-price">Min Price (CAD)</th>
+            <th>Max Price (CAD)</th>
             <th>Air Transat</th>
             <th>Google Maps</th>
-            <th>24h Drinks</th>
-            <th>24h Snacks</th>
-            <th>Departure</th>
-            <th>Return</th>
+            <th>Adults Only</th>
             <th>Packages</th>
           </tr>
         </thead>
@@ -183,9 +185,9 @@
               <td>{{ formatRating(hotel.google_rating) }}</td>
               <td>{{ formatNumber(hotel.review_count) }}</td>
               <td>
-                {{ formatCurrency(hotel.price_range.min) }} –
-                {{ formatCurrency(hotel.price_range.max) }}
+                {{ formatCurrency(hotel.price_range.min) }}
               </td>
+              <td>{{ formatCurrency(hotel.price_range.max) }}</td>
               <td>
                 <a
                   v-if="hotel.air_transat_url"
@@ -210,10 +212,7 @@
                 </a>
                 <span v-else>—</span>
               </td>
-              <td>{{ formatBinary(hotel.drinks24h) }}</td>
-              <td>{{ formatBinary(hotel.snacks24h) }}</td>
-              <td>{{ formatDate(hotel.departure_date ?? "") }}</td>
-              <td>{{ formatDate(hotel.return_date ?? "") }}</td>
+              <td>{{ formatAdultOnly(hotel.adult_only) }}</td>
               <td>
                 <button
                   type="button"
@@ -226,23 +225,25 @@
               </td>
             </tr>
             <tr v-if="isExpanded(hotel.id)">
-              <td colspan="6">
+              <td colspan="10">
                 <div class="packages" data-test="package-list">
                   <article
                     v-for="pkg in hotel.packages"
                     :key="pkg.departure + pkg.return"
                     class="package-card"
                   >
-                    <div>
-                      <strong>{{ pkg.departure }}</strong> →
-                      <strong>{{ pkg.return }}</strong>
-                      <span>({{ pkg.duration_days }} nights)</span>
+                    <div class="package-dates">
+                      <div><strong>Departure:</strong> {{ formatDate(pkg.departure) }}</div>
+                      <div><strong>Return:</strong> {{ formatDate(pkg.return) }}</div>
+                      <div><strong>Duration:</strong> {{ pkg.duration_days }} nights</div>
                     </div>
-                    <div>{{ pkg.room_type }}</div>
-                    <div>{{ formatCurrency(pkg.price) }}</div>
                     <div class="package-meta">
-                      <span>Drinks 24h: {{ formatBinary(pkg.drinks24h) }}</span>
-                      <span>Snacks 24h: {{ formatBinary(pkg.snacks24h) }}</span>
+                      <span><strong>Room:</strong> {{ pkg.room_type }}</span>
+                      <span><strong>Price:</strong> {{ formatCurrency(pkg.price) }}</span>
+                      <span><strong>24h Drinks:</strong> {{ formatBinary(pkg.drinks24h) }}</span>
+                      <span><strong>24h Snacks:</strong> {{ formatBinary(pkg.snacks24h) }}</span>
+                    </div>
+                    <div class="package-actions">
                       <a
                         v-if="pkg.url"
                         :href="pkg.url"
@@ -250,7 +251,7 @@
                         rel="noopener"
                         class="link"
                       >
-                        Air Transat
+                        View Package
                       </a>
                     </div>
                   </article>
@@ -282,6 +283,7 @@ import type {
   WebOutput
 } from "./types";
 import {
+  formatAdultOnly,
   formatBinary,
   formatCurrency,
   formatDate,
@@ -289,10 +291,10 @@ import {
   formatRating
 } from "./utils/format";
 
-const destinationOptions = ["cancun", "punta-cana", "riviera-maya"];
-const sourceOptions = ["transat", "expedia", "sunwing"];
+const destinationOptions = ["cancun", "punta-cana"];
+const sourceOptions = ["transat"];
 
-const destination = ref(destinationOptions[0]);
+const destination = ref(destinationOptions[1]);
 const source = ref(sourceOptions[0]);
 const hotels = ref<WebHotel[]>([]);
 const metadata = ref<WebMetadata | null>(null);
@@ -515,4 +517,8 @@ async function loadHotels(): Promise<void> {
     loading.value = false;
   }
 }
+
+loadHotels();
+
+loadHotels();
 </script>

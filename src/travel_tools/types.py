@@ -26,6 +26,7 @@ class HotelPackage(BaseModel):
     url: str | None = None
     drinks24h: bool = False
     snacks24h: bool = False
+    adult_only: int | None = None
     amenities: list[str] = Field(default_factory=list)
     price: float
     dates: PackageDates
@@ -61,6 +62,7 @@ class HotelData(BaseModel):
     google_maps_url: str | None = None
     drinks24h: bool = False
     snacks24h: bool = False
+    adult_only: int | None = None
     departure_date: str | None = None
     return_date: str | None = None
     source: str  # 'transat', 'expedia', etc.
@@ -82,10 +84,6 @@ class WebPackage(BaseModel):
     drinks24h: bool = False
     snacks24h: bool = False
 
-    class Config:
-        populate_by_name = True
-
-
 class WebHotel(BaseModel):
     """Hotel data formatted for web viewer."""
 
@@ -99,6 +97,7 @@ class WebHotel(BaseModel):
     google_maps_url: str | None = None
     drinks24h: bool = False
     snacks24h: bool = False
+    adult_only: int | None = None
     departure_date: str | None = None
     return_date: str | None = None
     price_range: PriceRange
