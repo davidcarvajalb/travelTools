@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  # Main pipeline service
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: traveltools-pipeline
+    volumes:
+      - ./data:/app/data
+      - ./outputs:/app/outputs
+    stdin_open: true
+    tty: true
+    command: python -m travel_tools.launcher
+
+  # Development service with interactive shell
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: traveltools-dev
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ./data:/app/data
+      - ./outputs:/app/outputs
+      - ./config:/app/config
+    stdin_open: true
+    tty: true
+    ports:
+      - "8000:8000"
+    command: /bin/bash
+
+  # Testing service
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: traveltools-test
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+    command: pytest -v --cov
+
+  # Individual step containers
+  filter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: traveltools-filter
+    volumes:
+      - ./data:/app/data
+    command: python -m travel_tools.step1_filter --destination ${DESTINATION:-cancun} --source ${SOURCE:-transat} --budget ${BUDGET:-5000}
+
+  scrape:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: traveltools-scrape
+    volumes:
+      - ./data:/app/data
+    command: python -m travel_tools.step2_scrape --destination ${DESTINATION:-cancun} --source ${SOURCE:-transat}
+
+  merge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: traveltools-merge
+    volumes:
+      - ./data:/app/data
+    command: python -m travel_tools.step3_merge --destination ${DESTINATION:-cancun} --source ${SOURCE:-transat}
+
+  generate-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: traveltools-generate-web
+    volumes:
+      - ./data:/app/data
+      - ./outputs:/app/outputs
+    command: python -m travel_tools.step4_generate_web --destination ${DESTINATION:-cancun} --source ${SOURCE:-transat}
+
+  # Web server to view outputs
+  webserver:
+    image: python:3.11-slim
+    container_name: traveltools-webserver
+    volumes:
+      - ./outputs:/app/outputs
+    working_dir: /app/outputs
+    ports:
+      - "8080:8000"
+    command: python -m http.server 8000

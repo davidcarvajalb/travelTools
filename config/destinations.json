@@ -1,0 +1,23 @@
+{
+  "cancun": {
+    "display_name": "Cancun",
+    "country": "Mexico",
+    "timezone": "America/Cancun",
+    "currency": "CAD",
+    "sources": ["transat", "expedia", "sunwing"]
+  },
+  "punta-cana": {
+    "display_name": "Punta Cana",
+    "country": "Dominican Republic",
+    "timezone": "America/Santo_Domingo",
+    "currency": "CAD",
+    "sources": ["transat", "sunwing"]
+  },
+  "riviera-maya": {
+    "display_name": "Riviera Maya",
+    "country": "Mexico",
+    "timezone": "America/Cancun",
+    "currency": "CAD",
+    "sources": ["transat", "expedia"]
+  }
+}

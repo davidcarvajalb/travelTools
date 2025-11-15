@@ -1,0 +1,28 @@
+# Testing Dockerfile with all test dependencies
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    gnupg \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy requirements
+COPY requirements.txt requirements-dev.txt ./
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
+
+# Copy application code
+COPY src/ ./src/
+COPY tests/ ./tests/
+COPY pyproject.toml pytest.ini mypy.ini ./
+
+# Install package
+RUN pip install -e .
+
+# Run tests by default
+CMD ["pytest", "-v", "--cov"]
