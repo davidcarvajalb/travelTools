@@ -45,7 +45,7 @@ web_client/dist/
 
 # Project specific
 data/*/
-outputs/*/
+outputs/*
 *.log
 
 # Environment variables
