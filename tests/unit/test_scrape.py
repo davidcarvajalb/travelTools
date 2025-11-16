@@ -11,6 +11,7 @@ from travel_tools.step2_scrape import (
     scrape_hotel,
     scrape_with_retry,
     scrape_reviews,
+    deduplicate_reviews,
 )
 
 
@@ -135,9 +136,11 @@ def test_scrape_reviews_extracts_review_data():
         if "wiI7pd" in selector:  # text
             mock.first.text_content.return_value = "Great hotel with amazing pool!"
             mock.first.is_visible.return_value = False
-        elif "stars" in selector:  # rating
+        elif "star" in selector:  # rating via aria-label/text
             mock.first.get_attribute.return_value = "5 stars"
             mock.first.text_content.return_value = "5 stars"
+        elif 'span:has-text("/")' in selector:
+            mock.first.text_content.return_value = "5/5"
         elif "DZSIDd" in selector or "xRkPPb" in selector:  # date (updated selectors)
             mock.first.text_content.return_value = "2 weeks ago"
         elif "d4r55" in selector:  # name (updated selector)
@@ -147,17 +150,28 @@ def test_scrape_reviews_extracts_review_data():
     review1.locator.side_effect = review1_locator
 
     # Mock page.locator for feed and reviews
+    # Mock feed container with scroll + locator
+    feed = MagicMock()
+    feed.first = MagicMock()
+    feed.first.scroll_into_view_if_needed.return_value = None
+    feed.first.locator.return_value.all.return_value = [review1]
+
     def page_locator(selector):
-        mock = MagicMock()
         if "feed" in selector:
-            mock.first.evaluate = MagicMock()
-            return mock
-        elif "data-review-id" in selector:
+            return feed
+        if "data-review-id" in selector:
+            mock = MagicMock()
             mock.all.return_value = [review1]
             return mock
-        return mock
+        if 'span:has-text("/")' in selector:
+            mock = MagicMock()
+            mock.first = MagicMock()
+            mock.first.text_content.return_value = "5/5"
+            return mock
+        return MagicMock()
 
     page.locator.side_effect = page_locator
+    page.mouse.wheel.return_value = None
 
     reviews = scrape_reviews("Test Hotel", page, max_reviews=10)
 
@@ -187,3 +201,16 @@ def test_scrape_reviews_returns_empty_on_error():
     reviews = scrape_reviews("Test Hotel", page, max_reviews=10)
 
     assert reviews == []
+
+
+def test_deduplicate_reviews():
+    from travel_tools.types import Review
+
+    review = Review(text="Great stay", rating=5, date="today", reviewer_name="Alex")
+    duplicates = [
+        review,
+        review,
+        Review(text="Great stay", rating=5, date="today", reviewer_name="Alex"),
+    ]
+    unique = deduplicate_reviews(duplicates)
+    assert len(unique) == 1

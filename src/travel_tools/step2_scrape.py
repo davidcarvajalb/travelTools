@@ -32,7 +32,26 @@ def extract_unique_hotels(packages: list[dict]) -> list[str]:
     return sorted(hotels)
 
 
-def scrape_reviews(hotel_name: str, page: Page, max_reviews: int = 10, debug: bool = False, debug_dir: Path | None = None) -> list[Review]:
+def deduplicate_reviews(reviews: list[Review]) -> list[Review]:
+    """Remove duplicate reviews based on text/rating/name."""
+    deduped: list[Review] = []
+    seen: set[tuple[str | None, int | None, str | None]] = set()
+    for review in reviews:
+        key = (review.text, review.rating, review.reviewer_name)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(review)
+    return deduped
+
+
+def scrape_reviews(
+    hotel_name: str,
+    page: Page,
+    max_reviews: int = 10,
+    debug: bool = False,
+    debug_dir: Path | None = None,
+) -> list[Review]:
     """Scrape reviews from Google Maps for a hotel.
 
     Args:
@@ -67,29 +86,55 @@ def scrape_reviews(hotel_name: str, page: Page, max_reviews: int = 10, debug: bo
             console.print(f"[yellow]Step 1: Looking for Reviews tab...[/yellow]")
 
         reviews_tab_clicked = False
-        try:
-            page.click('button[aria-label*="Reviews"]', timeout=5000)
-            reviews_tab_clicked = True
-            if debug:
-                console.print(f"[green]✓ Clicked Reviews tab (aria-label selector)[/green]")
-        except Exception as e1:
-            if debug:
-                console.print(f"[yellow]  First selector failed: {e1}[/yellow]")
-            # Try alternative selector
+        review_tab_selectors = [
+            'button[aria-label*="Reviews"]',
+            'button:has-text("Reviews")',
+            'div[role="tab"]:has-text("Reviews")',
+            'button[jsaction*="pane.reviewChart.moreReviews"]',
+            'a:has-text("Reviews")',
+        ]
+        for sel in review_tab_selectors:
             try:
-                page.click('button:has-text("Reviews")', timeout=5000)
+                page.click(sel, timeout=5000)
                 reviews_tab_clicked = True
                 if debug:
-                    console.print(f"[green]✓ Clicked Reviews tab (text selector)[/green]")
-            except Exception as e2:
+                    console.print(f"[green]✓ Clicked Reviews tab ({sel})[/green]")
+                break
+            except Exception as exc:
                 if debug:
-                    console.print(f"[red]✗ Could not find Reviews tab: {e2}[/red]")
-                    if debug_dir:
-                        fail_html = debug_dir / f"{safe_name}_02_no_reviews_tab.html"
-                        with open(fail_html, 'w') as f:
-                            f.write(page.content())
-                        console.print(f"[blue]📄 Saved HTML for inspection: {fail_html}[/blue]")
-                return []
+                    console.print(f"[yellow]  Selector failed ({sel}): {exc}[/yellow]")
+
+        if not reviews_tab_clicked:
+            # Fallback: click the first place result (skip ads) and retry
+            try:
+                result_link = page.locator('a[href*="/place"][aria-label]').first
+                result_label = result_link.get_attribute("aria-label", timeout=2000) or ""
+                if debug:
+                    console.print(f"[yellow]Attempting fallback place click: {result_label}[/yellow]")
+                result_link.click(timeout=5000)
+                page.wait_for_timeout(2000)
+                for sel in review_tab_selectors:
+                    try:
+                        page.click(sel, timeout=5000)
+                        reviews_tab_clicked = True
+                        if debug:
+                            console.print(f"[green]✓ Clicked Reviews tab after fallback ({sel})[/green]")
+                        break
+                    except Exception:
+                        continue
+            except Exception as exc:
+                if debug:
+                    console.print(f"[yellow]Fallback place click failed: {exc}[/yellow]")
+
+        if not reviews_tab_clicked:
+            if debug:
+                console.print(f"[red]✗ Could not find Reviews tab[/red]")
+                if debug_dir:
+                    fail_html = debug_dir / f"{safe_name}_02_no_reviews_tab.html"
+                    with open(fail_html, 'w') as f:
+                        f.write(page.content())
+                    console.print(f"[blue]📄 Saved HTML for inspection: {fail_html}[/blue]")
+            return []
 
         page.wait_for_timeout(2000)  # Wait for reviews to load
 
@@ -101,32 +146,70 @@ def scrape_reviews(hotel_name: str, page: Page, max_reviews: int = 10, debug: bo
             page.screenshot(path=str(after_click_screenshot))
             console.print(f"[blue]📸 Saved after Reviews click:[/blue] {after_click_screenshot}")
 
-        # Scroll to load more reviews
+        # Scroll to load more reviews (infinite scroll)
         if debug:
             console.print(f"[yellow]Step 2: Scrolling to load reviews...[/yellow]")
 
+        reviews_container = None
         try:
-            reviews_container = page.locator('div[role="feed"]').first
-            scroll_count = max_reviews // 5 + 1
-            if debug:
-                console.print(f"[blue]  Scrolling {scroll_count} times...[/blue]")
-            for i in range(scroll_count):
-                reviews_container.evaluate('el => el.scrollBy(0, 500)')
-                page.wait_for_timeout(500)
-                if debug and i % 2 == 0:
-                    console.print(f"[blue]  Scroll {i+1}/{scroll_count}...[/blue]")
-            if debug:
-                console.print(f"[green]✓ Scrolling complete[/green]")
-        except Exception as e:
-            if debug:
-                console.print(f"[yellow]⚠ Could not scroll reviews: {e}[/yellow]")
-                console.print(f"[yellow]  Continuing with available reviews...[/yellow]")
+            loc = page.locator('div[role="feed"]')
+            if loc.count() > 0:
+                reviews_container = loc.first
+        except Exception:
+            reviews_container = None
+
+        scroll_target = reviews_container or page
+        scroll_iterations = max((max_reviews // 4) + 8, 12)
+        loaded = 0
+        for i in range(scroll_iterations):
+            try:
+                scroll_target.scroll_into_view_if_needed(timeout=2000)
+            except Exception:
+                pass
+            page.mouse.wheel(0, 2000)
+            page.wait_for_timeout(700)
+            try:
+                loaded = len((reviews_container or page).locator("div[data-review-id]").all())
+            except Exception:
+                loaded = 0
+            if debug and (i % 2 == 0):
+                console.print(f"[blue]  Scroll {i+1}/{scroll_iterations}... found {loaded} review nodes[/blue]")
+
+        if debug:
+            console.print(f"[green]✓ Scrolling attempts complete[/green]")
 
         # Extract review elements
         if debug:
             console.print(f"[yellow]Step 3: Extracting review elements...[/yellow]")
 
-        review_elements = page.locator('div[data-review-id]').all()
+        review_elements = []
+        try:
+            if reviews_container is not None:
+                review_elements = reviews_container.locator("div[data-review-id]").all()
+        except Exception:
+            review_elements = []
+        if not review_elements:
+            review_elements = page.locator("div[data-review-id]").all()
+
+        # If we still don't have enough reviews, keep scrolling to try to hit the target
+        min_target = max(max_reviews * 3, max_reviews + 15)
+        extra_scrolls = 0
+        while len(review_elements) < min_target and extra_scrolls < 20:
+            try:
+                if reviews_container:
+                    reviews_container.scroll_into_view_if_needed(timeout=2000)
+                page.mouse.wheel(0, 2200)
+                page.wait_for_timeout(700)
+                review_elements = (reviews_container or page).locator("div[data-review-id]").all()
+                extra_scrolls += 1
+                if debug:
+                    console.print(
+                        f"[blue]  Extra scroll {extra_scrolls}/20, found {len(review_elements)} review nodes[/blue]"
+                    )
+                if len(review_elements) >= min_target:
+                    break
+            except Exception:
+                break
 
         if debug:
             console.print(f"[blue]Found {len(review_elements)} review elements[/blue]")
@@ -139,7 +222,8 @@ def scrape_reviews(hotel_name: str, page: Page, max_reviews: int = 10, debug: bo
                 console.print(f"[blue]📄 Saved HTML with reviews: {after_scroll_html}[/blue]")
 
         reviews = []
-        for idx, review_elem in enumerate(review_elements[:max_reviews]):
+        target_count = max(max_reviews * 2, max_reviews + 10)  # oversample to offset duplicates
+        for idx, review_elem in enumerate(review_elements[:target_count]):
             if debug:
                 console.print(f"\n[cyan]Processing review {idx+1}/{min(len(review_elements), max_reviews)}...[/cyan]")
 
@@ -169,9 +253,23 @@ def scrape_reviews(hotel_name: str, page: Page, max_reviews: int = 10, debug: bo
 
                 # Extract star rating
                 try:
-                    rating_elem = review_elem.locator('span[role="img"][aria-label*="stars"]').first
-                    rating_text = rating_elem.get_attribute("aria-label", timeout=3000) or rating_elem.text_content(timeout=3000) or ""
-                    rating = int(float(rating_text.split()[0])) if rating_text else 3
+                    rating_text = ""
+                    try:
+                        rating_elem = review_elem.locator(
+                            'span[aria-label*="star"], span[role="img"][aria-label*="star"]'
+                        ).first
+                        rating_text = (
+                            rating_elem.get_attribute("aria-label", timeout=1500)
+                            or rating_elem.text_content(timeout=1500)
+                            or ""
+                        )
+                    except Exception:
+                        # Fallback: numeric text like "5/5" in a span (see debug HTML)
+                        rating_elem = review_elem.locator('span:has-text("/")').first
+                        rating_text = rating_elem.text_content(timeout=1500) or ""
+
+                    numeric_part = rating_text.split("/")[0].split()[0]
+                    rating = int(round(float(numeric_part))) if numeric_part else 3
                     if debug:
                         console.print(f"  Rating: {rating} stars (from '{rating_text}')")
                 except Exception as e:
@@ -232,15 +330,18 @@ def scrape_reviews(hotel_name: str, page: Page, max_reviews: int = 10, debug: bo
             console.print(f"[green]✓ Scraped {len(reviews)}/{len(review_elements[:max_reviews])} reviews for {hotel_name}[/green]")
             console.print(f"[cyan]{'='*60}[/cyan]\n")
 
+        # Deduplicate reviews (Google often renders duplicates when scrolling)
+        deduped = deduplicate_reviews(reviews)[:max_reviews]
+
         # Save final results
         if debug and debug_dir:
             reviews_json = debug_dir / f"{safe_name}_04_reviews.json"
             with open(reviews_json, 'w') as f:
                 import json
-                json.dump([r.model_dump() for r in reviews], f, indent=2)
+                json.dump([r.model_dump() for r in deduped], f, indent=2)
             console.print(f"[blue]💾 Saved reviews JSON: {reviews_json}[/blue]")
 
-        return reviews
+        return deduped
 
     except PlaywrightTimeoutError as e:
         if debug:
@@ -310,6 +411,11 @@ def scrape_hotel(hotel_name: str, page: Page, max_reviews: int = 0, debug: bool 
             reviews = scrape_reviews(hotel_name, page, max_reviews=max_reviews, debug=debug, debug_dir=debug_dir)
             if debug:
                 console.print(f"[blue]Scraped {len(reviews)} reviews for {hotel_name}[/blue]")
+            if not reviews:
+                console.print(
+                    f"[yellow]⚠ No reviews scraped for {hotel_name} (max_reviews={max_reviews}).[/yellow] "
+                    "Run with --debug for traces/screenshots."
+                )
 
         return GoogleRating(
             hotel_name=hotel_name,
@@ -344,9 +450,9 @@ def scrape_with_retry(hotel_name: str, page: Page, max_reviews: int = 0, debug: 
 )
 @click.option(
     "--max-reviews",
-    default=0,
+    default=10,
     type=int,
-    help="Maximum number of reviews to scrape per hotel (0 = skip reviews)",
+    help="Maximum number of reviews to scrape per hotel (0 = skip reviews, default: 10)",
 )
 @click.option(
     "--test-single-hotel",
@@ -406,6 +512,10 @@ def main(destination: str, source: str, headless: bool, debug: bool, max_reviews
                 try:
                     rating = scrape_with_retry(hotel, page, max_reviews=max_reviews, debug=debug, debug_dir=debug_dir if debug else None)
                     ratings.append(rating.model_dump())
+                    console.print(
+                        f"[blue]· {hotel}[/blue] | rating: {rating.rating or '—'} | "
+                        f"reviews scraped: {len(rating.reviews)} | review_count field: {rating.review_count}"
+                    )
                 except Exception as e:
                     console.print(f"[red]Failed to scrape {hotel}:[/red] {e}")
                     ratings.append(GoogleRating(hotel_name=hotel).model_dump())

@@ -49,3 +49,13 @@ def test_adds_urls_and_flags(sample_packages, sample_ratings):
     assert dreams["drinks24h"] is True
     assert dreams["snacks24h"] is True
     assert dreams["adult_only"] == 1
+
+
+def test_merges_review_summaries(sample_packages, sample_ratings):
+    """Review summaries should flow through merge output when provided."""
+    result = merge_data(sample_packages, sample_ratings, source="transat")
+    dreams = next(h for h in result if h["name"] == "Dreams Riviera Cancun")
+    summary = dreams.get("review_summary")
+    assert summary is not None
+    assert summary["good_points"] == ["Great pool", "Friendly staff"]
+    assert summary["overall_summary"].startswith("Strong experience")

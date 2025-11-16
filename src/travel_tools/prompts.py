@@ -30,30 +30,31 @@ class GeminiPrompts:
         Returns:
             Formatted prompt string
         """
-        return f"""Analyze the following hotel reviews for "{hotel_name}" and provide a structured summary.
+        return f"""Analyze the following hotel reviews and produce the JSON output below. Ignore duplicates, emojis, and filler phrases. Focus only on meaningful content.
 
-Reviews:
-{reviews_text}
-
-Please provide a JSON response with the following structure:
+Return ONLY this JSON:
 {{
-    "good_points": ["list of positive highlights from reviews"],
-    "bad_points": ["list of negative aspects mentioned"],
-    "ugly_points": ["list of serious issues or deal-breakers"],
-    "overall_summary": "A brief 2-3 sentence summary of the overall sentiment",
-    "review_count_analyzed": <number of reviews analyzed>
+  "good_points": [],
+  "bad_points": [],
+  "ugly_points": [],
+  "overall_summary": "",
+  "review_count_analyzed": 0
 }}
 
-Guidelines:
-- good_points: Extract recurring positive themes (e.g., "Great pool area", "Friendly staff")
-- bad_points: Extract common complaints that are concerning but not critical (e.g., "Food variety limited", "WiFi spotty")
-- ugly_points: Extract serious issues that might be deal-breakers (e.g., "Health/safety concerns", "Severe cleanliness issues", "Major maintenance problems")
-- Keep each point concise (1-2 sentences max)
-- Focus on recurring themes mentioned by multiple reviewers
-- Be honest and balanced - include both positives and negatives
-- overall_summary: Synthesize the overall experience in 2-3 sentences
+Rules:
+- Summarize only recurring themes across reviews
+- Max 5 items per list
+- Each item 8–20 words, concise and factual
+- good_points = commonly praised aspects
+- bad_points = moderate or occasional issues
+- ugly_points = serious or repeated deal-breakers
+- overall_summary = 2–3 sentences (40–70 words)
+- No markdown, no explanations, no extra text
+- Compress long reviews internally before extracting themes
+- If a theme appears only once, ignore it
 
-Return ONLY the JSON object, no additional text."""
+Reviews for "{hotel_name}":
+{reviews_text}"""
 
 
 class ClaudePrompts:

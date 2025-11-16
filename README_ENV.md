@@ -40,3 +40,9 @@ python -m travel_tools.step2_5_summarize \
   --source transat \
   --test-single-hotel
 exit
+EOF
+```
+
+## Podman + Make integration
+
+If a `.env` file is present in the repo root, `make run`, `make shell`, and other `podman-run.sh` commands automatically load it via `--env-file`. You do not need to manually export `GEMINI_API_KEY`; the container will pick it up on every rebuild so long as `.env` exists next to the Makefile.

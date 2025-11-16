@@ -65,15 +65,16 @@ export interface WebOutput {
 
 export type SortKey = "name" | "stars" | "rating" | "reviews" | "price";
 export type SortDirection = "asc" | "desc";
+export type AdultOnlyFilter = "any" | "yes" | "no" | "maybe";
 
 export interface FilterState {
   search: string;
   minRating: number;
-  stars: number[];
   price: {
     min: number;
     max: number;
   };
+  adultOnly: AdultOnlyFilter[];
   sortKey: SortKey;
   sortDirection: SortDirection;
 }
