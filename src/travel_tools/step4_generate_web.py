@@ -81,6 +81,7 @@ def transform_to_web_format(
             price_range=hotel["price_range"],
             package_count=len(web_packages),
             packages=web_packages,
+            review_summary=hotel.get("review_summary"),
         )
         web_hotels.append(web_hotel)
 

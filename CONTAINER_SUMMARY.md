@@ -73,6 +73,7 @@ cp /path/to/packages.json data/cancun/transat/raw/
 ```bash
 ./podman-run.sh pipeline
 # Or: make run
+# Optional: export GEMINI_API_KEY=your_key_here to enable AI summaries during the run
 ```
 
 ### 4. View Results
@@ -97,6 +98,7 @@ cp /path/to/packages.json data/cancun/transat/raw/
 # Individual steps
 ./podman-run.sh filter cancun transat 5000
 ./podman-run.sh scrape cancun transat
+./podman-run.sh summarize cancun transat   # requires GEMINI_API_KEY
 ./podman-run.sh merge cancun transat
 ./podman-run.sh web cancun transat
 
@@ -129,6 +131,7 @@ make run
 # Individual steps
 make filter DEST=cancun SOURCE=transat BUDGET=5000
 make scrape DEST=cancun SOURCE=transat
+make summarize DEST=cancun SOURCE=transat    # requires GEMINI_API_KEY
 make merge DEST=cancun SOURCE=transat
 make web DEST=cancun SOURCE=transat
 

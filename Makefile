@@ -1,5 +1,16 @@
 .PHONY: help build run dev test clean serve shell viewer serve_viewer
 
+MAX_REVIEWS ?= 10
+DEST ?= cancun
+SOURCE ?= transat
+BUDGET ?= 5000
+HEADLESS ?= true
+
+ifneq (,$(wildcard .env))
+include .env
+export $(shell sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' .env)
+endif
+
 # Default target
 help:
 	@echo "🌴 travelTools - Podman Commands"
@@ -17,7 +28,8 @@ help:
 	@echo ""
 	@echo "Individual steps:"
 	@echo "  make filter DEST=cancun SOURCE=transat BUDGET=5000"
-	@echo "  make scrape DEST=cancun SOURCE=transat"
+	@echo "  make scrape DEST=cancun SOURCE=transat MAX_REVIEWS=10"
+	@echo "  make summarize DEST=cancun SOURCE=transat   # requires GEMINI_API_KEY"
 	@echo "  make merge DEST=cancun SOURCE=transat"
 	@echo "  make web DEST=cancun SOURCE=transat"
 	@echo ""
@@ -54,7 +66,10 @@ filter:
 	@./podman-run.sh filter $(DEST) $(SOURCE) $(BUDGET)
 
 scrape:
-	@./podman-run.sh scrape $(DEST) $(SOURCE)
+	@./podman-run.sh scrape $(DEST) $(SOURCE) $(HEADLESS) $(MAX_REVIEWS)
+
+summarize:
+	@./podman-run.sh summarize $(DEST) $(SOURCE)
 
 merge:
 	@./podman-run.sh merge $(DEST) $(SOURCE)
@@ -83,6 +98,16 @@ clean:
 	@./podman-run.sh clean
 
 # All-in-one: filter -> scrape -> merge -> web
-pipeline: filter scrape merge web
+pipeline:
+	@./podman-run.sh filter $(DEST) $(SOURCE) $(BUDGET)
+	@./podman-run.sh scrape $(DEST) $(SOURCE) $(HEADLESS) $(MAX_REVIEWS)
+	@if [ -n "$$GEMINI_API_KEY" ]; then \
+		echo "🤖 GEMINI_API_KEY detected - running summarize step"; \
+		./podman-run.sh summarize $(DEST) $(SOURCE); \
+	else \
+		echo "⚠️  Skipping summarize (set GEMINI_API_KEY to enable)"; \
+	fi
+	@./podman-run.sh merge $(DEST) $(SOURCE)
+	@./podman-run.sh web $(DEST) $(SOURCE)
 	@echo "✅ Pipeline complete!"
 	@echo "View results with: make serve"

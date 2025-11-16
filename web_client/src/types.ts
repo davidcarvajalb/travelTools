@@ -1,3 +1,18 @@
+export interface Review {
+  text: string;
+  rating: number; // 1-5
+  date: string;
+  reviewer_name: string | null;
+}
+
+export interface ReviewSummary {
+  good_points: string[];
+  bad_points: string[];
+  ugly_points: string[];
+  overall_summary: string;
+  review_count_analyzed: number;
+}
+
 export interface PriceRange {
   min: number;
   max: number;
@@ -32,6 +47,7 @@ export interface WebHotel {
   price_range: PriceRange;
   package_count: number;
   packages: WebPackage[];
+  review_summary?: ReviewSummary | null;
 }
 
 export interface WebMetadata {
@@ -49,15 +65,36 @@ export interface WebOutput {
 
 export type SortKey = "name" | "stars" | "rating" | "reviews" | "price";
 export type SortDirection = "asc" | "desc";
+export type AdultOnlyFilter = "any" | "yes" | "no" | "maybe";
 
 export interface FilterState {
   search: string;
   minRating: number;
-  stars: number[];
   price: {
     min: number;
     max: number;
   };
+  adultOnly: AdultOnlyFilter[];
   sortKey: SortKey;
   sortDirection: SortDirection;
+}
+
+// Type guard functions
+export function hasReviewSummary(hotel: WebHotel): hotel is WebHotel & { review_summary: ReviewSummary } {
+  return hotel.review_summary !== null && hotel.review_summary !== undefined;
+}
+
+export function isValidReview(review: unknown): review is Review {
+  if (typeof review !== 'object' || review === null) {
+    return false;
+  }
+
+  const r = review as Review;
+  return (
+    typeof r.text === 'string' &&
+    typeof r.rating === 'number' &&
+    r.rating >= 1 &&
+    r.rating <= 5 &&
+    typeof r.date === 'string'
+  );
 }

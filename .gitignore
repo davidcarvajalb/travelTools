@@ -45,8 +45,12 @@ web_client/dist/
 
 # Project specific
 data/*/
-outputs/*/
+outputs/*
 *.log
+
+# Environment variables
+.env
+.env.fish
 
 # Keep structure
 !data/.gitkeep

@@ -86,8 +86,37 @@ def main() -> None:
         console.print("[red]Step 2 failed. Aborting pipeline.[/red]")
         sys.exit(1)
 
+    # Optional Step 2.5: AI summarization
+    if Confirm.ask(
+        "\n[bold]Run AI review summarization with Gemini? (requires API key)[/bold]",
+        default=False,
+    ):
+        api_key = os.getenv("GEMINI_API_KEY") or Prompt.ask(
+            "Enter GEMINI_API_KEY (leave blank to cancel)", password=True, default=""
+        )
+        if not api_key:
+            console.print("[yellow]Skipping summarization (no API key provided).[/yellow]")
+        else:
+            rate_limit = Prompt.ask(
+                "Rate limit between calls (seconds)", default="1.0"
+            ).strip()
+            cmd = (
+                "python -m travel_tools.step2_5_summarize "
+                f"--destination {destination} --source {source} "
+                f"--api-key {api_key} --rate-limit {rate_limit}"
+            )
+            result = os.system(cmd)
+            if result != 0:
+                if not Confirm.ask(
+                    "[yellow]Summarization failed. Continue without summaries?[/yellow]"
+                ):
+                    console.print("[red]Pipeline stopped after Step 2.5.[/red]")
+                    return
+    else:
+        console.print("[yellow]Skipping AI summarization (Step 2.5).[/yellow]")
+
     if not Confirm.ask("\n[bold]Continue to Step 3?[/bold]"):
-        console.print("[yellow]Pipeline stopped after Step 2.[/yellow]")
+        console.print("[yellow]Pipeline stopped after Step 2/2.5.[/yellow]")
         return
 
     # Step 3: Merge

@@ -12,6 +12,8 @@ services:
       - ./outputs:/app/outputs:Z
     stdin_open: true
     tty: true
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     command: python -m travel_tools.launcher
 
   # Development service

@@ -74,3 +74,15 @@ def test_includes_links_and_flags(sample_packages, sample_ratings):
     assert dreams["snacks24h"] is True
     assert dreams["adult_only"] == 1
     assert dreams["packages"][0]["url"] == "https://example.com/dreams"
+
+
+def test_includes_review_summaries(sample_packages, sample_ratings):
+    """Review summaries should be available in web output when present."""
+    from travel_tools.step3_merge import merge_data
+
+    merged = merge_data(sample_packages, sample_ratings, source="transat")
+    result = transform_to_web_format(merged, "cancun", "transat", 5000)
+
+    dreams = next(h for h in result["hotels"] if "Dreams" in h["name"])
+    assert dreams["review_summary"]["good_points"] == ["Great pool", "Friendly staff"]
+    assert dreams["review_summary"]["review_count_analyzed"] == 5

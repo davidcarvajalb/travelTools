@@ -7,7 +7,7 @@ from urllib.parse import quote_plus
 
 import click
 
-from .types import HotelData, HotelPackage, PriceRange
+from .types import HotelData, HotelPackage, PriceRange, ReviewSummary
 from .utils.file_ops import load_json, save_json
 from .utils.logger import console
 from .utils.validators import validate_file_exists
@@ -39,6 +39,15 @@ def merge_data(
     for hotel_name, hotel_pkgs in hotels_packages.items():
         # Get rating data
         rating_info = ratings_map.get(hotel_name, {})
+        summary_payload = rating_info.get("review_summary")
+        review_summary = None
+        if isinstance(summary_payload, dict):
+            try:
+                review_summary = ReviewSummary(**summary_payload)
+            except Exception as e:
+                console.print(
+                    f"[yellow]Warning:[/yellow] Skipping invalid review summary for {hotel_name}: {e}"
+                )
 
         # Calculate price range
         prices = [pkg["price"] for pkg in hotel_pkgs]
@@ -89,6 +98,7 @@ def merge_data(
             source=source,
             price_range=PriceRange(min=min(prices), max=max(prices), avg=mean(prices)),
             packages=packages,
+            review_summary=review_summary,
         )
 
         merged.append(hotel_data.model_dump(by_alias=True))
@@ -103,7 +113,12 @@ def main(destination: str, source: str) -> None:
     """Merge filtered packages with Google ratings."""
     # Paths
     filtered_dir = Path(f"data/{destination}/{source}/filtered")
-    ratings_file = Path(f"data/{destination}/{source}/scraped/google_ratings.json")
+    summarized_ratings_file = Path(
+        f"data/{destination}/{source}/scraped/ratings_with_summaries.json"
+    )
+    fallback_ratings_file = Path(
+        f"data/{destination}/{source}/scraped/google_ratings.json"
+    )
     output_path = Path(f"data/{destination}/{source}/merged/final_data.json")
 
     try:
@@ -115,6 +130,10 @@ def main(destination: str, source: str) -> None:
 
         # Validate
         validate_file_exists(filtered_file)
+
+        ratings_file = (
+            summarized_ratings_file if summarized_ratings_file.exists() else fallback_ratings_file
+        )
         validate_file_exists(ratings_file)
 
         # Load data

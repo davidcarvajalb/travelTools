@@ -61,11 +61,25 @@ def sample_ratings():
             "hotel_name": "Dreams Riviera Cancun",
             "rating": 4.5,
             "review_count": 12450,
+            "review_summary": {
+                "good_points": ["Great pool", "Friendly staff"],
+                "bad_points": ["Noise at night"],
+                "ugly_points": [],
+                "overall_summary": "Strong experience with minor noise issues.",
+                "review_count_analyzed": 5,
+            },
         },
         {
             "hotel_name": "Secrets Maroma",
             "rating": 4.7,
             "review_count": 8230,
+            "review_summary": {
+                "good_points": ["Amazing beach"],
+                "bad_points": [],
+                "ugly_points": [],
+                "overall_summary": "Beautiful property with stellar beach access.",
+                "review_count_analyzed": 4,
+            },
         },
     ]
 

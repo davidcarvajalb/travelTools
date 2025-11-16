@@ -3,15 +3,26 @@
 
 set -e
 
+ENV_FILE_ARGS=""
+if [ -f .env ]; then
+  ENV_FILE_ARGS="--env-file .env"
+fi
+
 COMMAND=${1:-pipeline}
 shift || true
 
 case $COMMAND in
   pipeline)
     echo "🌴 Running travelTools Pipeline (Interactive)"
+    ENV_ARGS=""
+    if [ -n "$GEMINI_API_KEY" ]; then
+      ENV_ARGS="-e GEMINI_API_KEY=$GEMINI_API_KEY"
+    fi
     podman run -it --rm \
       -v ./data:/app/data:Z \
       -v ./outputs:/app/outputs:Z \
+      $ENV_FILE_ARGS \
+      $ENV_ARGS \
       traveltools:latest
     ;;
 
@@ -24,6 +35,7 @@ case $COMMAND in
       -v ./data:/app/data:Z \
       -v ./outputs:/app/outputs:Z \
       -v ./config:/app/config:Z \
+      $ENV_FILE_ARGS \
       -p 8000:8000 \
       traveltools:dev
     ;;
@@ -33,6 +45,7 @@ case $COMMAND in
     podman run --rm \
       -v ./src:/app/src:Z \
       -v ./tests:/app/tests:Z \
+      $ENV_FILE_ARGS \
       traveltools:test "$@"
     ;;
 
@@ -43,6 +56,7 @@ case $COMMAND in
     echo "🔍 Running Step 1: Filter ($DEST/$SOURCE, budget: \$$BUDGET)"
     podman run --rm \
       -v ./data:/app/data:Z \
+      $ENV_FILE_ARGS \
       traveltools:latest \
       python -m travel_tools.step1_filter \
         --destination "$DEST" \
@@ -54,15 +68,37 @@ case $COMMAND in
     DEST=${1:-cancun}
     SOURCE=${2:-transat}
     HEADLESS=${3:-true}
+    MAX_REVIEWS=${4:-10}
     echo "🕷️  Running Step 2: Scrape ($DEST/$SOURCE) (headless: $HEADLESS)"
     echo "Note: This may take several minutes..."
     podman run --rm \
       -v ./data:/app/data:Z \
+      $ENV_FILE_ARGS \
       traveltools:latest \
       python -m travel_tools.step2_scrape \
         --destination "$DEST" \
         --source "$SOURCE" \
-        --headless "$HEADLESS"
+        --headless "$HEADLESS" \
+        --max-reviews "$MAX_REVIEWS"
+    ;;
+
+  summarize)
+    DEST=${1:-cancun}
+    SOURCE=${2:-transat}
+    echo "🤖 Running Step 2.5: AI Summarize ($DEST/$SOURCE)"
+    # Pass through GEMINI_API_KEY if set
+    ENV_ARGS=""
+    if [ -n "$GEMINI_API_KEY" ]; then
+      ENV_ARGS="-e GEMINI_API_KEY=$GEMINI_API_KEY"
+    fi
+    podman run --rm \
+      -v ./data:/app/data:Z \
+      $ENV_FILE_ARGS \
+      $ENV_ARGS \
+      traveltools:latest \
+      python -m travel_tools.step2_5_summarize \
+        --destination "$DEST" \
+        --source "$SOURCE"
     ;;
 
   merge)
@@ -71,6 +107,7 @@ case $COMMAND in
     echo "🔀 Running Step 3: Merge ($DEST/$SOURCE)"
     podman run --rm \
       -v ./data:/app/data:Z \
+      $ENV_FILE_ARGS \
       traveltools:latest \
       python -m travel_tools.step3_merge \
         --destination "$DEST" \
@@ -84,6 +121,7 @@ case $COMMAND in
     podman run --rm \
       -v ./data:/app/data:Z \
       -v ./outputs:/app/outputs:Z \
+      $ENV_FILE_ARGS \
       traveltools:latest \
       python -m travel_tools.step4_generate_web \
         --destination "$DEST" \
@@ -96,6 +134,7 @@ case $COMMAND in
     echo "View outputs at: http://localhost:$PORT"
     podman run --rm \
       -v ./outputs:/app/outputs:Z \
+      $ENV_FILE_ARGS \
       -p "$PORT:8000" \
       -w /app/outputs \
       python:3.11-slim \
@@ -104,9 +143,16 @@ case $COMMAND in
 
   shell)
     echo "🐚 Opening shell in container"
+    # Pass through GEMINI_API_KEY if set
+    ENV_ARGS=""
+    if [ -n "$GEMINI_API_KEY" ]; then
+      ENV_ARGS="-e GEMINI_API_KEY=$GEMINI_API_KEY"
+    fi
     podman run -it --rm \
       -v ./data:/app/data:Z \
       -v ./outputs:/app/outputs:Z \
+      $ENV_FILE_ARGS \
+      $ENV_ARGS \
       traveltools:latest \
       /bin/bash
     ;;
@@ -127,6 +173,7 @@ case $COMMAND in
     echo "  test [args]          Run tests (pass pytest args)"
     echo "  filter <dest> <src> <budget>   Run step 1: Filter"
     echo "  scrape <dest> <src>            Run step 2: Scrape"
+    echo "  summarize <dest> <src>         Run step 2.5: AI Summarize"
     echo "  merge <dest> <src>             Run step 3: Merge"
     echo "  web <dest> <src>               Run step 4: Generate web"
     echo "  serve [port]         Start web server (default: 8080)"
@@ -137,6 +184,7 @@ case $COMMAND in
     echo "  $0 pipeline                          # Interactive launcher"
     echo "  $0 filter cancun transat 5000       # Filter packages"
     echo "  $0 scrape cancun transat            # Scrape ratings"
+    echo "  export GEMINI_API_KEY=xyz && $0 summarize cancun transat  # AI summarize"
     echo "  $0 serve 8080                       # View outputs"
     echo "  $0 test                             # Run all tests"
     echo "  $0 dev                              # Development shell"

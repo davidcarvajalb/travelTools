@@ -7,6 +7,7 @@ A Python-based hotel research pipeline that automates filtering, scraping, and a
 - ✅ Filter hotel packages by budget
 - ✅ Scrape Google Maps ratings automatically (Playwright)
 - ✅ Merge package data with ratings
+- ✅ Optional AI review summaries with Google Gemini
 - ✅ Generate interactive web viewer with filters and sorting
 - ✅ Shared Vue + TypeScript viewer powered by Vitest
 - ✅ Support multiple destinations and package sources
@@ -59,9 +60,10 @@ python -m travel_tools.launcher
 
 The launcher will:
 1. Prompt for destination, source, and budget
-2. Run each step sequentially
-3. Ask for confirmation between steps
-4. Generate the final web viewer
+2. Offer optional AI summarization (Step 2.5) if you have a GEMINI_API_KEY
+3. Run each step sequentially
+4. Ask for confirmation between steps
+5. Generate the final web viewer
 
 **Option 2: Individual Steps**
 
@@ -72,12 +74,77 @@ python -m travel_tools.step1_filter --destination cancun --source transat --budg
 # Step 2: Scrape Google Maps ratings
 python -m travel_tools.step2_scrape --destination cancun --source transat
 
+# Step 2.5: Summarize reviews with Gemini (requires GEMINI_API_KEY)
+python -m travel_tools.step2_5_summarize --destination cancun --source transat
+# Tip: export GEMINI_API_KEY=your_key_here before running.
+# Tip: add --hotel-name "Exact Hotel Name" to summarize only one hotel
+# Tip: add --skip-existing-summaries to reuse summaries already written to ratings_with_summaries.json
+
 # Step 3: Merge data
 python -m travel_tools.step3_merge --destination cancun --source transat
 
 # Step 4: Generate hotels.json for the viewer
 python -m travel_tools.step4_generate_web --destination cancun --source transat
 ```
+
+Copy-paste commands with the common flags (replace destination/source as needed):
+```bash
+# Step 1: filter
+python -m travel_tools.step1_filter \
+  --destination cancun \
+  --source transat \
+  --budget 5000
+
+# Step 2: scrape
+python -m travel_tools.step2_scrape \
+  --destination cancun \
+  --source transat \
+  --headless true \
+  --max-reviews 200
+
+# Step 2.5: summarize (requires GEMINI_API_KEY or --api-key)
+python -m travel_tools.step2_5_summarize \
+  --destination cancun \
+  --source transat \
+  --model gemini-2.5-flash-lite \
+  --rate-limit 1.0 \
+  --hotel-name "Exact Hotel (optional)" \
+  --skip-existing-summaries \
+  --max-reviews-per-hotel 150 \
+  --max-new-summaries 5
+
+python -m travel_tools.step2_5_summarize \
+  --destination punta-cana \
+  --source transat \
+  --model gemini-2.5-pro \
+  --hotel-name "BlueBay Villas Doradas" \
+  --skip-existing-summaries
+
+
+python -m travel_tools.step2_5_summarize \
+  --destination punta-cana \
+  --source transat \
+  --model gemini-2.5-flash-lite \
+  --rate-limit 60 \
+  --skip-existing-summaries
+
+# Step 3: merge
+python -m travel_tools.step3_merge \
+  --destination cancun \
+  --source transat
+
+# Step 4: generate web
+python -m travel_tools.step4_generate_web \
+  --destination cancun \
+  --source transat
+```
+
+Flags per step (for reference):
+- `step1_filter`: `--destination`, `--source`, `--budget`
+- `step2_scrape`: `--destination`, `--source`, `--headless {true|false}`, `--max-reviews`
+- `step2_5_summarize`: `--destination`, `--source`, `--api-key`, `--model`, `--rate-limit`, `--hotel-name`, `--skip-existing-summaries`, `--max-reviews-per-hotel`, `--max-new-summaries`, `--test-single-hotel`
+- `step3_merge`: `--destination`, `--source`
+- `step4_generate_web`: `--destination`, `--source`
 
 ### View Results
 
@@ -146,8 +213,12 @@ Step 2: Scrape
   Input:  budget_5000.json
   Output: data/cancun/transat/scraped/google_ratings.json
   ↓
+Step 2.5: AI Summaries
+  Input:  google_ratings.json
+  Output: data/cancun/transat/scraped/ratings_with_summaries.json
+  ↓
 Step 3: Merge
-  Input:  budget_5000.json + google_ratings.json
+  Input:  budget_5000.json + ratings_with_summaries.json (or google_ratings.json fallback)
   Output: data/cancun/transat/merged/final_data.json
   ↓
 Step 4: Generate Web
