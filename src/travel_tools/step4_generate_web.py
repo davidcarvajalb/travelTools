@@ -53,10 +53,15 @@ def transform_to_web_format(
                     return_date=ret_dt.strftime("%Y-%m-%d"),
                     duration_days=duration_days,
                     room_type=pkg.get("room_type", "Standard"),
+                    meal_plan_code=pkg.get("meal_plan_code"),
+                    meal_plan_label=pkg.get("meal_plan_label"),
+                    number_of_restaurants=pkg.get("number_of_restaurants"),
+                    spa_available=pkg.get("spa_available"),
+                    thumbnail_url=pkg.get("thumbnail_url"),
                     price=pkg.get("price", 0),
                     url=pkg.get("url"),
-                    drinks24h=bool(pkg.get("drinks24h")),
-                    snacks24h=bool(pkg.get("snacks24h")),
+                    drinks24h=pkg.get("drinks24h"),
+                    snacks24h=pkg.get("snacks24h"),
                 )
                 web_packages.append(web_pkg)
             except Exception as e:
@@ -73,9 +78,14 @@ def transform_to_web_format(
             review_count=hotel.get("review_count"),
             air_transat_url=hotel.get("air_transat_url"),
             google_maps_url=hotel.get("google_maps_url"),
-            drinks24h=hotel.get("drinks24h", False),
-            snacks24h=hotel.get("snacks24h", False),
+            drinks24h=hotel.get("drinks24h"),
+            snacks24h=hotel.get("snacks24h"),
             adult_only=hotel.get("adult_only"),
+            number_of_restaurants=hotel.get("number_of_restaurants"),
+            spa_available=hotel.get("spa_available"),
+            meal_plan_code=hotel.get("meal_plan_code"),
+            meal_plan_label=hotel.get("meal_plan_label"),
+            thumbnail_url=hotel.get("thumbnail_url"),
             departure_date=hotel.get("departure_date"),
             return_date=hotel.get("return_date"),
             price_range=hotel["price_range"],
@@ -106,6 +116,7 @@ def transform_to_web_format(
 def main(destination: str, source: str) -> None:
     """Generate JSON payload used by the Vue web viewer."""
     # Paths
+    normalized_file = Path(f"data/{destination}/{source}/normalized/final_data.json")
     merged_file = Path(f"data/{destination}/{source}/merged/final_data.json")
     filtered_dir = Path(f"data/{destination}/{source}/filtered")
     output_dir = Path(f"outputs/{destination}/{source}")
@@ -113,7 +124,8 @@ def main(destination: str, source: str) -> None:
 
     try:
         # Validate
-        validate_file_exists(merged_file)
+        source_file = normalized_file if normalized_file.exists() else merged_file
+        validate_file_exists(source_file)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # Get budget from filtered file
@@ -125,8 +137,8 @@ def main(destination: str, source: str) -> None:
                 budget = int(latest_filtered.stem.split("_")[1])
 
         # Load merged data
-        console.print(f"[blue]Loading merged data from:[/blue] {merged_file}")
-        merged_data = load_json(merged_file)
+        console.print(f"[blue]Loading merged data from:[/blue] {source_file}")
+        merged_data = load_json(source_file)
 
         # Transform to web format
         console.print("[blue]Transforming data for web viewer...[/blue]")

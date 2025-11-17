@@ -43,6 +43,7 @@ help:
 	@echo "  make build && make run"
 	@echo "  make filter DEST=punta-cana BUDGET=6000"
 	@echo "  make pipeline && make viewer && make serve_viewer"
+	@echo "  make pipeline-all    # run all destinations/sources (host Python)"
 	@echo ""
 
 # Build all images
@@ -111,3 +112,7 @@ pipeline:
 	@./podman-run.sh web $(DEST) $(SOURCE)
 	@echo "✅ Pipeline complete!"
 	@echo "View results with: make serve"
+
+# Run all destinations/sources with default skip behavior (host env)
+pipeline-all:
+	@python -m travel_tools.launcher --all --budget $(BUDGET)

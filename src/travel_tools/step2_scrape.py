@@ -443,6 +443,18 @@ def scrape_with_retry(hotel_name: str, page: Page, max_reviews: int = 0, debug: 
 @click.option("--source", required=True, type=str, help="Package source")
 @click.option("--headless", default=True, type=bool, help="Run browser in headless mode")
 @click.option(
+    "--hotel",
+    type=str,
+    default=None,
+    help="Only scrape the hotel with this exact name (case-insensitive)",
+)
+@click.option(
+    "--force-scrape",
+    is_flag=True,
+    default=False,
+    help="Re-scrape even if existing rating/review data is present",
+)
+@click.option(
     "--debug",
     is_flag=True,
     default=False,
@@ -460,7 +472,16 @@ def scrape_with_retry(hotel_name: str, page: Page, max_reviews: int = 0, debug: 
     default=False,
     help="Only scrape the first hotel (for testing)",
 )
-def main(destination: str, source: str, headless: bool, debug: bool, max_reviews: int, test_single_hotel: bool) -> None:
+def main(
+    destination: str,
+    source: str,
+    headless: bool,
+    debug: bool,
+    max_reviews: int,
+    test_single_hotel: bool,
+    hotel: str | None,
+    force_scrape: bool,
+) -> None:
     """Scrape Google Maps ratings for hotels."""
     # Find most recent filtered file
     filtered_dir = Path(f"data/{destination}/{source}/filtered")
@@ -477,6 +498,13 @@ def main(destination: str, source: str, headless: bool, debug: bool, max_reviews
         packages = load_json(filtered_file)
         hotels = extract_unique_hotels(packages)
 
+        if hotel:
+            hotels = [h for h in hotels if h.lower() == hotel.lower()]
+            if not hotels:
+                console.print(f"[red]Hotel '{hotel}' not found in filtered packages[/red]")
+                raise click.Abort()
+            console.print(f"[yellow]Filtering to hotel:[/yellow] {hotels[0]}")
+
         # Limit to single hotel for testing if requested
         if test_single_hotel:
             hotels = hotels[:1]
@@ -491,6 +519,20 @@ def main(destination: str, source: str, headless: bool, debug: bool, max_reviews
         debug_dir = scrape_dir / "debug"
         if debug:
             debug_dir.mkdir(parents=True, exist_ok=True)
+
+        existing_ratings = {}
+        if output_path.exists():
+            for entry in load_json(output_path):
+                name = entry.get("hotel_name")
+                if name:
+                    existing_ratings[name.lower()] = entry
+
+        def has_complete_rating(entry: dict) -> bool:
+            return (
+                entry.get("rating") is not None
+                and entry.get("review_count") is not None
+                and bool(entry.get("reviews"))
+            )
 
         # Scrape with Playwright
         with sync_playwright() as p:
@@ -507,24 +549,36 @@ def main(destination: str, source: str, headless: bool, debug: bool, max_reviews
                     sources=True,
                 )
 
-            ratings = []
             for hotel in track(hotels, description="Scraping hotels"):
                 try:
-                    rating = scrape_with_retry(hotel, page, max_reviews=max_reviews, debug=debug, debug_dir=debug_dir if debug else None)
-                    ratings.append(rating.model_dump())
+                    existing_entry = existing_ratings.get(hotel.lower())
+                    if existing_entry and not force_scrape and has_complete_rating(existing_entry):
+                        console.print(f"[green]✓ Skipping {hotel}: existing scrape data found[/green]")
+                        continue
+
+                    rating = scrape_with_retry(
+                        hotel,
+                        page,
+                        max_reviews=max_reviews,
+                        debug=debug,
+                        debug_dir=debug_dir if debug else None,
+                    )
+                    existing_ratings[hotel.lower()] = rating.model_dump()
                     console.print(
                         f"[blue]· {hotel}[/blue] | rating: {rating.rating or '—'} | "
                         f"reviews scraped: {len(rating.reviews)} | review_count field: {rating.review_count}"
                     )
                 except Exception as e:
                     console.print(f"[red]Failed to scrape {hotel}:[/red] {e}")
-                    ratings.append(GoogleRating(hotel_name=hotel).model_dump())
+                    existing_ratings[hotel.lower()] = GoogleRating(hotel_name=hotel).model_dump()
                     if debug:
                         screenshot_path = debug_dir / f"{hotel.replace(' ', '_')}_error.png"
                         page.screenshot(path=str(screenshot_path), full_page=True)
                         console.print(
                             f"[yellow]Captured error screenshot for {hotel} at {screenshot_path}[/yellow]"
                         )
+
+                save_json(list(existing_ratings.values()), output_path)
 
             if debug and trace_path:
                 page.context.tracing.stop(path=str(trace_path))
@@ -535,12 +589,15 @@ def main(destination: str, source: str, headless: bool, debug: bool, max_reviews
 
             browser.close()
 
-        # Save results
-        save_json(ratings, output_path)
+        save_json(list(existing_ratings.values()), output_path)
 
         # Report
-        success_count = sum(1 for r in ratings if r.get("rating") is not None)
-        console.print(f"[green]✓[/green] Scraped {success_count}/{len(hotels)} hotels successfully")
+        success_count = sum(
+            1
+            for r in existing_ratings.values()
+            if r.get("rating") is not None and r.get("review_count") is not None
+        )
+        console.print(f"[green]✓[/green] Scraped/retained {success_count}/{len(hotels)} hotels successfully")
         console.print(f"[blue]Output:[/blue] {output_path}")
 
     except FileNotFoundError as e:

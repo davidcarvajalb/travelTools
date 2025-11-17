@@ -61,7 +61,7 @@ python -m travel_tools.launcher
 The launcher will:
 1. Prompt for destination, source, and budget
 2. Offer optional AI summarization (Step 2.5) if you have a GEMINI_API_KEY
-3. Run each step sequentially
+3. Run each step sequentially (filter → scrape → summarize → merge → normalize → generate web)
 4. Ask for confirmation between steps
 5. Generate the final web viewer
 
@@ -71,14 +71,15 @@ The launcher will:
 # Step 1: Filter by budget
 python -m travel_tools.step1_filter --destination cancun --source transat --budget 5000
 
-# Step 2: Scrape Google Maps ratings
+# Step 2: Scrape Google Maps ratings (skips hotels with existing rating/reviews by default)
 python -m travel_tools.step2_scrape --destination cancun --source transat
+# Add --force-scrape to re-run everything, or --hotel "Exact Hotel" to target one hotel
 
 # Step 2.5: Summarize reviews with Gemini (requires GEMINI_API_KEY)
 python -m travel_tools.step2_5_summarize --destination cancun --source transat
+# Default: skips hotels that already have review_summary; add --force-summarize to regenerate
 # Tip: export GEMINI_API_KEY=your_key_here before running.
-# Tip: add --hotel-name "Exact Hotel Name" to summarize only one hotel
-# Tip: add --skip-existing-summaries to reuse summaries already written to ratings_with_summaries.json
+# Tip: add --hotel "Exact Hotel Name" to summarize only one hotel
 
 # Step 3: Merge data
 python -m travel_tools.step3_merge --destination cancun --source transat
@@ -133,6 +134,11 @@ python -m travel_tools.step3_merge \
   --destination cancun \
   --source transat
 
+# Step 3.5: normalize for web (new fields, HTTPS thumbnails, defaults)
+python -m travel_tools.step3_5_normalize \
+  --destination cancun \
+  --source transat
+
 # Step 4: generate web
 python -m travel_tools.step4_generate_web \
   --destination cancun \
@@ -141,10 +147,21 @@ python -m travel_tools.step4_generate_web \
 
 Flags per step (for reference):
 - `step1_filter`: `--destination`, `--source`, `--budget`
-- `step2_scrape`: `--destination`, `--source`, `--headless {true|false}`, `--max-reviews`
-- `step2_5_summarize`: `--destination`, `--source`, `--api-key`, `--model`, `--rate-limit`, `--hotel-name`, `--skip-existing-summaries`, `--max-reviews-per-hotel`, `--max-new-summaries`, `--test-single-hotel`
-- `step3_merge`: `--destination`, `--source`
+- `step2_scrape`: `--destination`, `--source`, `--headless {true|false}`, `--max-reviews`, `--hotel`, `--force-scrape`
+- `step2_5_summarize`: `--destination`, `--source`, `--api-key`, `--model`, `--rate-limit`, `--hotel`, `--force-summarize`, `--max-reviews-per-hotel`, `--max-new-summaries`, `--test-single-hotel`
+- `step3_merge`: `--destination`, `--source`, `--hotel`
+- `step3_5_normalize`: `--destination`, `--source`
 - `step4_generate_web`: `--destination`, `--source`
+
+### Run Everything (all destinations/sources)
+
+Process every destination/source declared in `config/destinations.json`, skipping scrape/summarize when data already exists (use `--force-scrape` / `--force-summarize` to override):
+
+```bash
+python -m travel_tools.launcher --all --budget 5000
+# or
+make pipeline-all BUDGET=5000
+```
 
 ### View Results
 

@@ -69,6 +69,26 @@ def merge_data(
         snacks24h = any(pkg.snacks24h for pkg in packages)
         adult_values = [pkg.adult_only for pkg in packages if pkg.adult_only is not None]
         adult_only = adult_values[0] if adult_values else None
+        number_of_restaurants = next(
+            (pkg.number_of_restaurants for pkg in packages if pkg.number_of_restaurants is not None),
+            None,
+        )
+        spa_available = next(
+            (pkg.spa_available for pkg in packages if pkg.spa_available is not None),
+            None,
+        )
+        meal_plan_code = next(
+            (pkg.meal_plan_code for pkg in packages if pkg.meal_plan_code),
+            None,
+        )
+        meal_plan_label = next(
+            (pkg.meal_plan_label for pkg in packages if pkg.meal_plan_label),
+            None,
+        )
+        thumbnail_url = next(
+            (pkg.thumbnail_url for pkg in packages if pkg.thumbnail_url),
+            None,
+        )
         departure_date = (
             min(pkg.dates.departure for pkg in packages).isoformat()
             if packages
@@ -93,6 +113,11 @@ def merge_data(
             drinks24h=drinks24h,
             snacks24h=snacks24h,
             adult_only=adult_only,
+            number_of_restaurants=number_of_restaurants,
+            spa_available=spa_available,
+            meal_plan_code=meal_plan_code,
+            meal_plan_label=meal_plan_label,
+            thumbnail_url=thumbnail_url,
             departure_date=departure_date,
             return_date=return_date,
             source=source,
@@ -109,7 +134,13 @@ def merge_data(
 @click.command()
 @click.option("--destination", required=True, type=str, help="Destination name")
 @click.option("--source", required=True, type=str, help="Package source")
-def main(destination: str, source: str) -> None:
+@click.option(
+    "--hotel",
+    type=str,
+    default=None,
+    help="Only merge the hotel with this exact name (case-insensitive)",
+)
+def main(destination: str, source: str, hotel: str | None) -> None:
     """Merge filtered packages with Google ratings."""
     # Paths
     filtered_dir = Path(f"data/{destination}/{source}/filtered")
@@ -139,6 +170,9 @@ def main(destination: str, source: str) -> None:
         # Load data
         console.print(f"[blue]Loading packages from:[/blue] {filtered_file}")
         packages = load_json(filtered_file)
+        if hotel:
+            packages = [p for p in packages if p.get("hotel_name", "").lower() == hotel.lower()]
+            console.print(f"[yellow]Filtering merge to hotel:[/yellow] {hotel}")
 
         console.print(f"[blue]Loading ratings from:[/blue] {ratings_file}")
         ratings = load_json(ratings_file)
