@@ -44,11 +44,18 @@ def transform_transat_package(transat_pkg: dict) -> dict:
     if stars is not None:
         stars = int(round(stars))
 
+    meal_plan_code = transat_pkg.get('mealPlanCode')
+
     return {
         'hotel_name': hotel.get('name', 'Unknown Hotel'),
         'city': hotel.get('city', 'Unknown'),
         'stars': stars,
-        'room_type': transat_pkg.get('mealPlanCode', 'Standard'),  # Using meal plan as room type for now
+        'room_type': meal_plan_code or 'Standard',  # Using meal plan as room type for now
+        'meal_plan_code': meal_plan_code,
+        'meal_plan_label': None,
+        'number_of_restaurants': num_restaurants if num_restaurants > 0 else None,
+        'spa_available': hotel.get('spaAvailable'),
+        'thumbnail_url': hotel.get('thumbnailPath'),
         'url': hotel.get('url'),
         'drinks24h': hotel.get('drinks24h') == 1,
         'snacks24h': hotel.get('snacks24h') == 1,

@@ -376,10 +376,16 @@ def process_hotel_ratings(
     help="Only summarize the hotel with this exact name",
 )
 @click.option(
-    "--skip-existing-summaries",
+    "--hotel",
+    type=str,
+    default=None,
+    help="Alias for --hotel-name",
+)
+@click.option(
+    "--force-summarize",
     is_flag=True,
     default=False,
-    help="Skip hotels that already have a review_summary in the output file",
+    help="Force regeneration even if a summary already exists",
 )
 @click.option(
     "--max-reviews-per-hotel",
@@ -401,7 +407,8 @@ def main(
     rate_limit: float,
     test_single_hotel: bool,
     hotel_name: str | None,
-    skip_existing_summaries: bool,
+    hotel: str | None,
+    force_summarize: bool,
     max_reviews_per_hotel: int | None,
     max_new_summaries: int | None,
 ) -> None:
@@ -441,6 +448,7 @@ def main(
 
     existing_output = load_existing_output(output_file)
     existing_summaries = {}
+    skip_existing_summaries = not force_summarize
     if skip_existing_summaries:
         existing_summaries = load_existing_summaries(output_file)
         console.print(
@@ -455,7 +463,7 @@ def main(
         model_name=model,
         rate_limit_delay=rate_limit,
         test_single=test_single_hotel,
-        hotel_filter=hotel_name,
+        hotel_filter=hotel_name or hotel,
         skip_existing_summaries=skip_existing_summaries,
         existing_summaries=existing_summaries,
         existing_output=existing_output,

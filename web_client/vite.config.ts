@@ -16,6 +16,19 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
-    globals: true
+    globals: true,
+    css: false,
+    setupFiles: "./src/__tests__/setup.ts",
+    deps: {
+      inline: ["vuetify"]
+    },
+    environmentOptions: {
+      jsdom: {
+        resources: "usable"
+      }
+    }
+  },
+  ssr: {
+    noExternal: ["vuetify"]
   }
 });

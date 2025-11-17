@@ -33,6 +33,7 @@ export function formatDate(value: string): string {
 }
 
 export function formatBinary(value: boolean | null | undefined): string {
+  if (value === null || value === undefined) return "Unknown";
   return value ? "Yes" : "No";
 }
 

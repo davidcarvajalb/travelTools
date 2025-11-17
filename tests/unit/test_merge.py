@@ -49,6 +49,11 @@ def test_adds_urls_and_flags(sample_packages, sample_ratings):
     assert dreams["drinks24h"] is True
     assert dreams["snacks24h"] is True
     assert dreams["adult_only"] == 1
+    assert dreams["number_of_restaurants"] == 6
+    assert dreams["spa_available"] == "Available"
+    assert dreams["meal_plan_code"] == "AI"
+    assert dreams["meal_plan_label"] == "All Inclusive"
+    assert dreams["thumbnail_url"] == "https://example.com/dreams.jpg"
 
 
 def test_merges_review_summaries(sample_packages, sample_ratings):

@@ -14,7 +14,7 @@
               <code>outputs/&lt;destination&gt;/&lt;source&gt;/hotels.json</code>.
             </p>
           </div>
-          <form class="filters-grid" @submit.prevent="loadHotels">
+          <div class="filters-grid">
             <div class="select-wrapper">
               <label for="destination">Destination slug</label>
               <v-select
@@ -27,6 +27,7 @@
                 density="comfortable"
                 placeholder="Choose destination"
                 hide-details
+                @update:model-value="loadHotels"
               />
             </div>
             <div class="select-wrapper">
@@ -41,21 +42,10 @@
                 density="comfortable"
                 placeholder="Choose source"
                 hide-details
+                @update:model-value="loadHotels"
               />
             </div>
-            <div class="load-button">
-              <label>&nbsp;</label>
-              <v-btn
-                color="primary"
-                class="w-100"
-                type="submit"
-                data-test="load-button"
-                :disabled="loading || !destination || !source"
-              >
-                {{ loading ? "Loading…" : "Load Hotels" }}
-              </v-btn>
-            </div>
-          </form>
+          </div>
           <p class="status-banner" v-if="!metadata">
             Example path: <code>outputs/cancun/transat/hotels.json</code>
           </p>
@@ -136,22 +126,44 @@
                 />
               </div>
               <div>
-                <div class="checkbox-label">Adults only</div>
-                <v-checkbox-group
-                  v-model="filters.adultOnly"
-                  class="checkbox-group"
+                <v-checkbox
+                  v-model="filters.requireAdultsOnly"
+                  :label="`Adults only`"
                   :disabled="loading || !hasFiltersEnabled"
-                >
-                  <v-checkbox
-                    v-for="option in adultOnlyOptions"
-                    :key="option"
-                    :label="adultOnlyLabel(option)"
-                    :value="option"
-                    hide-details
-                    density="comfortable"
-                    :data-test="`adult-checkbox-${option}`"
-                  />
-                </v-checkbox-group>
+                  density="comfortable"
+                  hide-details
+                  data-test="adult-checkbox"
+                />
+              </div>
+              <div>
+                <v-checkbox
+                  v-model="filters.requireDrinks24h"
+                  :label="labels.drinks24h"
+                  :disabled="loading || !hasFiltersEnabled"
+                  density="comfortable"
+                  hide-details
+                  data-test="drinks-checkbox"
+                />
+              </div>
+              <div>
+                <v-checkbox
+                  v-model="filters.requireSnacks24h"
+                  :label="labels.snacks24h"
+                  :disabled="loading || !hasFiltersEnabled"
+                  density="comfortable"
+                  hide-details
+                  data-test="snacks-checkbox"
+                />
+              </div>
+              <div>
+                <v-checkbox
+                  v-model="filters.requireSpa"
+                  :label="labels.spaAvailable"
+                  :disabled="loading || !hasFiltersEnabled"
+                  density="comfortable"
+                  hide-details
+                  data-test="spa-checkbox"
+                />
               </div>
             </div>
             <p class="filters-note">
@@ -173,21 +185,67 @@
         </v-card>
 
         <section v-if="metadata" class="card table-card">
+          <div class="column-chooser">
+            <div class="checkbox-label">Table columns</div>
+            <div class="column-chooser__options">
+              <v-checkbox
+                v-for="col in columnOptions"
+                :key="col.key"
+                :model-value="isColumnVisible(col.key)"
+                @update:model-value="toggleColumn(col.key)"
+                :label="col.label"
+                density="compact"
+                hide-details
+                color="primary"
+                :data-test="`col-${col.key}`"
+              />
+            </div>
+          </div>
           <div class="table-wrapper" v-if="filteredHotels.length">
             <table>
               <thead>
                 <tr>
                   <th @click="changeSort('name')" data-test="sort-name">Hotel</th>
-                  <th @click="changeSort('stars')" data-test="sort-stars">Stars</th>
-                  <th @click="changeSort('rating')" data-test="sort-rating">Rating</th>
-                  <th @click="changeSort('reviews')" data-test="sort-reviews">Reviews</th>
-                  <th @click="changeSort('price')" data-test="sort-price">Min Price (CAD)</th>
-                  <th>Max Price (CAD)</th>
-                  <th>Air Transat</th>
-                  <th>Google Maps</th>
-                  <th>AI Summary</th>
-                  <th>Adults Only</th>
-                  <th>Packages</th>
+                  <th
+                    v-if="isColumnVisible('stars')"
+                    @click="changeSort('stars')"
+                    data-test="sort-stars"
+                  >
+                    Stars
+                  </th>
+                  <th
+                    v-if="isColumnVisible('rating')"
+                    @click="changeSort('rating')"
+                    data-test="sort-rating"
+                  >
+                    Rating
+                  </th>
+                  <th
+                    v-if="isColumnVisible('reviews')"
+                    @click="changeSort('reviews')"
+                    data-test="sort-reviews"
+                  >
+                    Reviews
+                  </th>
+                  <th
+                    v-if="isColumnVisible('price_min')"
+                    @click="changeSort('price')"
+                    data-test="sort-price"
+                  >
+                    Min Price (CAD)
+                  </th>
+                  <th v-if="isColumnVisible('price_max')">Max Price (CAD)</th>
+                  <th v-if="isColumnVisible('air_transat')">Air Transat</th>
+                  <th v-if="isColumnVisible('google_maps')">Google Maps</th>
+                  <th v-if="isColumnVisible('summary')">AI Summary</th>
+                  <th v-if="isColumnVisible('drinks24h')">{{ labels.drinks24h }}</th>
+                  <th v-if="isColumnVisible('snacks24h')">{{ labels.snacks24h }}</th>
+                  <th v-if="isColumnVisible('restaurants')">{{ labels.restaurants }}</th>
+                  <th v-if="isColumnVisible('spa')">{{ labels.spaAvailable }}</th>
+                  <th v-if="isColumnVisible('meal_plan')">{{ labels.mealPlan }}</th>
+                  <th v-if="isColumnVisible('adult_only')">Adults Only</th>
+                  <th v-if="isColumnVisible('packages')">Packages</th>
+                  <th v-if="isColumnVisible('thumbnail')">{{ labels.thumbnail }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -197,14 +255,14 @@
                       <strong>{{ hotel.name }}</strong>
                       <div class="muted">{{ hotel.city }}</div>
                     </td>
-                    <td>{{ hotel.stars ?? "—" }}</td>
-                    <td>{{ formatRating(hotel.google_rating) }}</td>
-                    <td>{{ formatNumber(hotel.review_count) }}</td>
-                    <td>
+                    <td v-if="isColumnVisible('stars')">{{ hotel.stars ?? "—" }}</td>
+                    <td v-if="isColumnVisible('rating')">{{ formatRating(hotel.google_rating) }}</td>
+                    <td v-if="isColumnVisible('reviews')">{{ formatNumber(hotel.review_count) }}</td>
+                    <td v-if="isColumnVisible('price_min')">
                       {{ formatCurrency(hotel.price_range.min) }}
                     </td>
-                    <td>{{ formatCurrency(hotel.price_range.max) }}</td>
-                    <td>
+                    <td v-if="isColumnVisible('price_max')">{{ formatCurrency(hotel.price_range.max) }}</td>
+                    <td v-if="isColumnVisible('air_transat')">
                       <a
                         v-if="hotel.air_transat_url"
                         :href="hotel.air_transat_url"
@@ -216,7 +274,7 @@
                       </a>
                       <span v-else>—</span>
                     </td>
-                    <td>
+                    <td v-if="isColumnVisible('google_maps')">
                       <a
                         v-if="hotel.google_maps_url"
                         :href="hotel.google_maps_url"
@@ -228,7 +286,7 @@
                       </a>
                       <span v-else>—</span>
                     </td>
-                    <td>
+                    <td v-if="isColumnVisible('summary')">
                       <v-btn
                         v-if="hasReviewSummary(hotel)"
                         variant="tonal"
@@ -248,8 +306,19 @@
                         ⏳ WIP
                       </span>
                     </td>
-                    <td>{{ formatAdultOnly(hotel.adult_only) }}</td>
-                    <td>
+                    <td v-if="isColumnVisible('drinks24h')">{{ formatBinary(hotel.drinks24h) }}</td>
+                    <td v-if="isColumnVisible('snacks24h')">{{ formatBinary(hotel.snacks24h) }}</td>
+                    <td v-if="isColumnVisible('restaurants')">
+                      {{ hotel.number_of_restaurants ?? labels.unknown }}
+                    </td>
+                    <td v-if="isColumnVisible('spa')">
+                      {{ hotel.spa_available ?? labels.unknown }}
+                    </td>
+                    <td v-if="isColumnVisible('meal_plan')">
+                      {{ formatMealPlan(hotel.meal_plan_code, hotel.meal_plan_label) }}
+                    </td>
+                    <td v-if="isColumnVisible('adult_only')">{{ formatAdultOnly(hotel.adult_only) }}</td>
+                    <td v-if="isColumnVisible('packages')">
                       <v-btn
                         variant="outlined"
                         color="primary"
@@ -260,9 +329,20 @@
                         {{ isExpanded(hotel.id) ? "Hide" : "Show" }} ({{ hotel.package_count }})
                       </v-btn>
                     </td>
+                    <td v-if="isColumnVisible('thumbnail')">
+                      <v-img
+                        v-if="hotel.thumbnail_url"
+                        :src="hotel.thumbnail_url"
+                        height="80"
+                        width="120"
+                        cover
+                        class="thumbnail"
+                      />
+                      <span v-else>{{ labels.unknown }}</span>
+                    </td>
                   </tr>
                   <tr v-if="isExpanded(hotel.id)">
-                    <td colspan="11">
+                    <td :colspan="visibleColumns.length + 1">
                       <div class="packages" data-test="package-list">
                         <article
                           v-for="pkg in hotel.packages"
@@ -275,10 +355,15 @@
                             <div><strong>Duration:</strong> {{ pkg.duration_days }} nights</div>
                           </div>
                           <div class="package-meta">
-                            <span><strong>Room:</strong> {{ pkg.room_type }}</span>
-                            <span><strong>Price:</strong> {{ formatCurrency(pkg.price) }}</span>
-                            <span><strong>24h Drinks:</strong> {{ formatBinary(pkg.drinks24h) }}</span>
-                            <span><strong>24h Snacks:</strong> {{ formatBinary(pkg.snacks24h) }}</span>
+                            <ul class="stacked">
+                              <li><strong>Room:</strong> {{ pkg.room_type }}</li>
+                              <li><strong>Meal plan:</strong> {{ formatMealPlan(pkg.meal_plan_code, pkg.meal_plan_label) }}</li>
+                              <li><strong>Price:</strong> {{ formatCurrency(pkg.price) }}</li>
+                              <li><strong>{{ labels.drinks24h }}:</strong> {{ formatBinary(pkg.drinks24h) }}</li>
+                              <li><strong>{{ labels.snacks24h }}:</strong> {{ formatBinary(pkg.snacks24h) }}</li>
+                              <li><strong>{{ labels.restaurants }}:</strong> {{ pkg.number_of_restaurants ?? labels.unknown }}</li>
+                              <li><strong>{{ labels.spaAvailable }}:</strong> {{ pkg.spa_available ?? labels.unknown }}</li>
+                            </ul>
                           </div>
                           <div class="package-actions">
                             <a
@@ -290,6 +375,14 @@
                             >
                               View Package
                             </a>
+                            <v-img
+                              v-if="pkg.thumbnail_url"
+                              :src="pkg.thumbnail_url"
+                              height="120"
+                              width="180"
+                              cover
+                              class="thumbnail"
+                            />
                           </div>
                         </article>
                       </div>
@@ -385,7 +478,10 @@ import type {
   SortKey,
   WebHotel,
   WebMetadata,
-  WebOutput
+  WebOutput,
+  ColumnKey,
+  TriState,
+  SpaFilter
 } from "./types";
 import {
   formatAdultOnly,
@@ -397,10 +493,24 @@ import {
 } from "./utils/format";
 import { hasReviewSummary } from "./types";
 
-const destinationOptions = ["cancun", "punta-cana"];
+const labels: Record<string, string> = {
+  filtersTitle: "Filters",
+  fineTune: "Fine-tune your stay",
+  drinks24h: "24h Drinks",
+  snacks24h: "24h Snacks",
+  spaAvailable: "Spa",
+  mealPlan: "Meal plan",
+  restaurants: "Restaurants",
+  thumbnail: "Thumbnail",
+  unknown: "Unknown",
+  yes: "Yes",
+  no: "No"
+};
+
+const destinationOptions = ["cancun", "punta-cana", "riviera-maya"];
 const sourceOptions = ["transat"];
 
-const destination = ref(destinationOptions[1]);
+const destination = ref(destinationOptions[0]);
 const source = ref(sourceOptions[0]);
 const hotels = ref<WebHotel[]>([]);
 const metadata = ref<WebMetadata | null>(null);
@@ -418,12 +528,48 @@ const filters = reactive<FilterState>({
     min: 0,
     max: 0
   },
-  adultOnly: [],
+  requireDrinks24h: false,
+  requireSnacks24h: false,
+  requireSpa: false,
+  requireAdultsOnly: false,
   sortKey: "name",
   sortDirection: "asc"
 });
 
+const visibleColumns = ref<ColumnKey[]>([
+  "stars",
+  "rating",
+  "reviews",
+  "price_min",
+  "price_max",
+  "air_transat",
+  "google_maps",
+  "summary",
+  "adult_only",
+  "packages",
+  // leave the rest optional by default
+]);
+
 const priceBounds = ref({ min: 0, max: 0 });
+
+const columnOptions = computed(() => [
+  { key: "stars", label: "Stars" },
+  { key: "rating", label: "Rating" },
+  { key: "reviews", label: "Reviews" },
+  { key: "price_min", label: "Min Price" },
+  { key: "price_max", label: "Max Price" },
+  { key: "air_transat", label: "Air Transat" },
+  { key: "google_maps", label: "Google Maps" },
+  { key: "summary", label: "AI Summary" },
+  { key: "adult_only", label: "Adults Only" },
+  { key: "packages", label: "Packages" },
+  { key: "drinks24h", label: labels.drinks24h },
+  { key: "snacks24h", label: labels.snacks24h },
+  { key: "restaurants", label: labels.restaurants },
+  { key: "spa", label: labels.spaAvailable },
+  { key: "meal_plan", label: labels.mealPlan },
+  { key: "thumbnail", label: labels.thumbnail }
+]);
 
 const ratingOptions = computed(() => {
   const values = Array.from(
@@ -444,21 +590,6 @@ const ratingSelectItems = computed(() => [
     value: rating
   }))
 ]);
-
-const adultOnlyOptions = computed<AdultOnlyFilter[]>(() => {
-  const values = Array.from(
-    new Set(
-      hotels.value
-        .map((hotel) => mapAdultOnly(hotel.adult_only))
-        .filter((value): value is AdultOnlyFilter => value !== null && value !== "any")
-    )
-  );
-  if (!values.length) {
-    return ["yes", "no", "maybe"];
-  }
-  const order: AdultOnlyFilter[] = ["yes", "no", "maybe"];
-  return values.sort((a, b) => order.indexOf(a) - order.indexOf(b));
-});
 
 const hasFiltersEnabled = computed(() => hotels.value.length > 0);
 const activeSummary = computed(() =>
@@ -482,11 +613,20 @@ const filteredHotels = computed(() => {
     );
   }
 
-  if (filters.adultOnly.length) {
-    result = result.filter((hotel) => {
-      const mapped = mapAdultOnly(hotel.adult_only);
-      return mapped ? filters.adultOnly.includes(mapped) : false;
-    });
+  if (filters.requireDrinks24h) {
+    result = result.filter((hotel) => mapTriBool(hotel.drinks24h) === "yes");
+  }
+
+  if (filters.requireSnacks24h) {
+    result = result.filter((hotel) => mapTriBool(hotel.snacks24h) === "yes");
+  }
+
+  if (filters.requireSpa) {
+    result = result.filter((hotel) => mapSpa(hotel.spa_available) === "yes");
+  }
+
+  if (filters.requireAdultsOnly) {
+    result = result.filter((hotel) => mapAdultOnly(hotel.adult_only) === "yes");
   }
 
   result = result.filter(
@@ -559,7 +699,10 @@ function updateFilterBounds(data: WebHotel[]): void {
 function resetFilters(): void {
   filters.search = "";
   filters.minRating = 0;
-  filters.adultOnly = [];
+  filters.requireDrinks24h = false;
+  filters.requireSnacks24h = false;
+  filters.requireSpa = false;
+  filters.requireAdultsOnly = false;
   filters.sortKey = "name";
   filters.sortDirection = "asc";
   updateFilterBounds(hotels.value);
@@ -598,6 +741,18 @@ function togglePackages(id: string): void {
     next.add(id);
   }
   expandedHotels.value = next;
+}
+
+function isColumnVisible(key: ColumnKey): boolean {
+  return visibleColumns.value.includes(key);
+}
+
+function toggleColumn(key: ColumnKey): void {
+  if (visibleColumns.value.includes(key)) {
+    visibleColumns.value = visibleColumns.value.filter((k) => k !== key);
+    return;
+  }
+  visibleColumns.value = [...visibleColumns.value, key];
 }
 
 function openSummary(hotel: WebHotel): void {
@@ -651,10 +806,27 @@ function mapAdultOnly(value: number | null | undefined): AdultOnlyFilter | null 
   return "maybe";
 }
 
-function adultOnlyLabel(option: AdultOnlyFilter): string {
-  if (option === "yes") return "Yes";
-  if (option === "no") return "No";
-  if (option === "maybe") return "Maybe";
-  return "Any";
+function mapTriBool(value: boolean | null | undefined): TriState {
+  if (value === true) return "yes";
+  if (value === false) return "no";
+  return "unknown";
+}
+
+function mapSpa(value: string | number | null | undefined): SpaFilter {
+  if (value === null || value === undefined || value === "") return "unknown";
+  if (typeof value === "number") {
+    if (value === 0) return "no";
+    if (value > 0) return "yes";
+    return "unknown";
+  }
+  const normalized = value.toString().trim().toLowerCase();
+  if (["no", "not available", "none", "n"].includes(normalized)) return "no";
+  return "yes";
+}
+
+function formatMealPlan(code?: string | null, label?: string | null): string {
+  if (label) return label;
+  if (code) return code;
+  return labels.unknown;
 }
 </script>

@@ -23,6 +23,11 @@ class HotelPackage(BaseModel):
     city: str
     stars: int | None = None
     room_type: str
+    meal_plan_code: str | None = None
+    meal_plan_label: str | None = None
+    number_of_restaurants: int | None = None
+    spa_available: str | int | None = None
+    thumbnail_url: str | None = None
     url: str | None = None
     drinks24h: bool = False
     snacks24h: bool = False
@@ -85,6 +90,11 @@ class HotelData(BaseModel):
     drinks24h: bool = False
     snacks24h: bool = False
     adult_only: int | None = None
+    number_of_restaurants: int | None = None
+    spa_available: str | int | None = None
+    meal_plan_code: str | None = None
+    meal_plan_label: str | None = None
+    thumbnail_url: str | None = None
     departure_date: str | None = None
     return_date: str | None = None
     source: str  # 'transat', 'expedia', etc.
@@ -102,6 +112,11 @@ class WebPackage(BaseModel):
     return_date: str = Field(alias="return")
     duration_days: int
     room_type: str
+    meal_plan_code: str | None = None
+    meal_plan_label: str | None = None
+    number_of_restaurants: int | None = None
+    spa_available: str | int | None = None
+    thumbnail_url: str | None = None
     price: float
     url: str | None = None
     drinks24h: bool = False
@@ -121,6 +136,11 @@ class WebHotel(BaseModel):
     drinks24h: bool = False
     snacks24h: bool = False
     adult_only: int | None = None
+    number_of_restaurants: int | None = None
+    spa_available: str | int | None = None
+    meal_plan_code: str | None = None
+    meal_plan_label: str | None = None
+    thumbnail_url: str | None = None
     departure_date: str | None = None
     return_date: str | None = None
     price_range: PriceRange

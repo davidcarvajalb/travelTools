@@ -73,7 +73,16 @@ def test_includes_links_and_flags(sample_packages, sample_ratings):
     assert dreams["drinks24h"] is True
     assert dreams["snacks24h"] is True
     assert dreams["adult_only"] == 1
+    assert dreams["number_of_restaurants"] == 6
+    assert dreams["spa_available"] == "Available"
+    assert dreams["meal_plan_code"] == "AI"
+    assert dreams["meal_plan_label"] == "All Inclusive"
+    assert dreams["thumbnail_url"] == "https://example.com/dreams.jpg"
     assert dreams["packages"][0]["url"] == "https://example.com/dreams"
+    assert dreams["packages"][0]["meal_plan_code"] == "AI"
+    assert dreams["packages"][0]["meal_plan_label"] == "All Inclusive"
+    assert dreams["packages"][0]["number_of_restaurants"] == 6
+    assert dreams["packages"][0]["spa_available"] == "Available"
 
 
 def test_includes_review_summaries(sample_packages, sample_ratings):
