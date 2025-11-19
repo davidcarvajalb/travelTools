@@ -507,7 +507,7 @@ const labels: Record<string, string> = {
   no: "No"
 };
 
-const destinationOptions = ["cancun", "punta-cana", "riviera-maya"];
+const destinationOptions = ["cancun", "punta-cana", "martinique"];
 const sourceOptions = ["transat"];
 
 const destination = ref(destinationOptions[0]);

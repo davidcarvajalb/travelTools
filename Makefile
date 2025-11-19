@@ -5,6 +5,8 @@ DEST ?= cancun
 SOURCE ?= transat
 BUDGET ?= 5000
 HEADLESS ?= true
+MODEL ?= gemini-2.5-flash
+RATE_LIMIT ?= 1.0
 
 ifneq (,$(wildcard .env))
 include .env
@@ -29,7 +31,7 @@ help:
 	@echo "Individual steps:"
 	@echo "  make filter DEST=cancun SOURCE=transat BUDGET=5000"
 	@echo "  make scrape DEST=cancun SOURCE=transat MAX_REVIEWS=10"
-	@echo "  make summarize DEST=cancun SOURCE=transat   # requires GEMINI_API_KEY"
+	@echo "  make summarize DEST=cancun SOURCE=transat MODEL=gemini-2.5-flash   # requires GEMINI_API_KEY"
 	@echo "  make merge DEST=cancun SOURCE=transat"
 	@echo "  make web DEST=cancun SOURCE=transat"
 	@echo ""
@@ -70,7 +72,7 @@ scrape:
 	@./podman-run.sh scrape $(DEST) $(SOURCE) $(HEADLESS) $(MAX_REVIEWS)
 
 summarize:
-	@./podman-run.sh summarize $(DEST) $(SOURCE)
+	@./podman-run.sh summarize $(DEST) $(SOURCE) $(MODEL) $(RATE_LIMIT)
 
 merge:
 	@./podman-run.sh merge $(DEST) $(SOURCE)
@@ -104,7 +106,7 @@ pipeline:
 	@./podman-run.sh scrape $(DEST) $(SOURCE) $(HEADLESS) $(MAX_REVIEWS)
 	@if [ -n "$$GEMINI_API_KEY" ]; then \
 		echo "🤖 GEMINI_API_KEY detected - running summarize step"; \
-		./podman-run.sh summarize $(DEST) $(SOURCE); \
+		./podman-run.sh summarize $(DEST) $(SOURCE) $(MODEL) $(RATE_LIMIT); \
 	else \
 		echo "⚠️  Skipping summarize (set GEMINI_API_KEY to enable)"; \
 	fi

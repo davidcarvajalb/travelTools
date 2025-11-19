@@ -85,7 +85,9 @@ case $COMMAND in
   summarize)
     DEST=${1:-cancun}
     SOURCE=${2:-transat}
-    echo "🤖 Running Step 2.5: AI Summarize ($DEST/$SOURCE)"
+    MODEL=${3:-gemini-2.5-flash}
+    RATE_LIMIT=${4:-1.0}
+    echo "🤖 Running Step 2.5: AI Summarize ($DEST/$SOURCE) [model: $MODEL, rate-limit: ${RATE_LIMIT}s]"
     # Pass through GEMINI_API_KEY if set
     ENV_ARGS=""
     if [ -n "$GEMINI_API_KEY" ]; then
@@ -98,7 +100,9 @@ case $COMMAND in
       traveltools:latest \
       python -m travel_tools.step2_5_summarize \
         --destination "$DEST" \
-        --source "$SOURCE"
+        --source "$SOURCE" \
+        --model "$MODEL" \
+        --rate-limit "$RATE_LIMIT"
     ;;
 
   merge)

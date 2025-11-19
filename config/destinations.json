@@ -13,11 +13,11 @@
     "currency": "CAD",
     "sources": ["transat", "sunwing"]
   },
-  "riviera-maya": {
-    "display_name": "Riviera Maya",
-    "country": "Mexico",
+  "martinique": {
+    "display_name": "Martinique",
+    "country": "France",
     "timezone": "America/Cancun",
-    "currency": "CAD",
-    "sources": ["transat", "expedia"]
+    "currency": "Euro",
+    "sources": ["transat"]
   }
 }
