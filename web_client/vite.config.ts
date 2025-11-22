@@ -9,7 +9,6 @@ export default defineConfig({
       autoImport: true
     })
   ],
-  base: "./",
   build: {
     outDir: "../outputs",
     emptyOutDir: false
