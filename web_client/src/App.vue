@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useHotels } from './composables/useHotels';
-import HeroSection from './components/HeroSection.vue';
 import HotelFilters from './components/HotelFilters.vue';
 import HotelTable from './components/HotelTable.vue';
 
@@ -21,6 +20,19 @@ const {
   resetFilters,
 } = useHotels();
 
+const drawer = ref(true);
+
+const destinations = [
+  { title: 'Cancun', value: 'cancun' },
+  { title: 'Punta Cana', value: 'punta-cana' },
+  { title: 'Martinique', value: 'martinique' },
+  { title: 'Puerto Plata & Samana', value: 'puerto-plata-samana' },
+];
+
+const sources = [
+  { title: 'Air Transat', value: 'transat' },
+];
+
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('en-CA', {
     style: 'currency',
@@ -28,13 +40,6 @@ const formatCurrency = (value: number) => {
     maximumFractionDigits: 0,
   }).format(value);
 };
-
-const destinationLabel = computed(() => {
-  return destination.value
-    .split('_')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-});
 
 const budgetLabel = computed(() => {
   return metadata.value ? formatCurrency(metadata.value.budget) : '-';
@@ -59,56 +64,82 @@ onMounted(() => {
 
 <template>
   <v-app>
-    <v-main>
-      <div class="page-container">
-        <HeroSection
-          v-model:destination="destination"
-          v-model:source="destinationSource"
-          :metadata="metadata"
-          :destination-label="destinationLabel"
-          :budget-label="budgetLabel"
-          :generated-label="generatedLabel"
-          :error-message="errorMessage"
-        />
+    <v-app-bar color="primary" density="compact" elevation="2">
+      <v-app-bar-nav-icon variant="text" @click.stop="drawer = !drawer"></v-app-bar-nav-icon>
+      
+      <v-app-bar-title>Travel Tools</v-app-bar-title>
 
-        <HotelFilters
-          v-model:filters="filters"
-          :loading="loading"
-          :metadata="metadata"
-          :hotel-count="hotelCount"
-          :price-bounds="priceBounds"
-          :has-filters-enabled="hasFiltersEnabled"
-          :labels="labels"
-          @reset="resetFilters"
-        />
+      <v-spacer></v-spacer>
+
+      <div class="d-flex align-center ga-4 mr-4">
+        <v-select
+          v-model="destination"
+          :items="destinations"
+          density="compact"
+          variant="outlined"
+          hide-details
+          bg-color="primary-darken-1"
+          class="app-bar-select"
+          style="width: 200px"
+        ></v-select>
+
+        <v-select
+          v-model="destinationSource"
+          :items="sources"
+          density="compact"
+          variant="outlined"
+          hide-details
+          bg-color="primary-darken-1"
+          class="app-bar-select"
+          style="width: 150px"
+        ></v-select>
+      </div>
+
+      <div class="text-caption mr-4 text-white d-none d-md-block" v-if="metadata">
+        <div>Budget: {{ budgetLabel }}</div>
+        <div class="text-medium-emphasis text-white">Updated: {{ generatedLabel }}</div>
+      </div>
+    </v-app-bar>
+
+    <v-navigation-drawer v-model="drawer" width="300">
+      <HotelFilters
+        v-model:filters="filters"
+        :loading="loading"
+        :metadata="metadata"
+        :hotel-count="hotelCount"
+        :price-bounds="priceBounds"
+        :has-filters-enabled="hasFiltersEnabled"
+        :labels="labels"
+        @reset="resetFilters"
+      />
+    </v-navigation-drawer>
+
+    <v-main class="bg-grey-lighten-4">
+      <v-container fluid class="pa-4 fill-height align-start">
+        <v-alert
+          v-if="errorMessage"
+          type="error"
+          title="Error loading data"
+          :text="errorMessage"
+          class="mb-4 w-100"
+          data-test="error-message"
+        ></v-alert>
 
         <HotelTable
+          v-if="!errorMessage"
           :hotels="filteredHotels"
           :metadata="metadata"
           :loading="loading"
           v-model:sort-key="filters.sortKey"
           v-model:sort-direction="filters.sortDirection"
         />
-      </div>
+      </v-container>
     </v-main>
   </v-app>
 </template>
 
 <style scoped>
-.page-container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-}
-
-.card {
-  background: white;
-  border-radius: 16px;
-  padding: 2rem;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+.app-bar-select :deep(.v-field__outline) {
+  --v-field-border-opacity: 0.2;
 }
 </style>

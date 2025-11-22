@@ -82,164 +82,177 @@ const openSummary = (hotel: WebHotel) => {
 </script>
 
 <template>
-  <section v-if="metadata" class="card table-card">
-    <div class="column-chooser">
-      <div class="checkbox-label">Table columns</div>
-      <div class="column-chooser__options">
-        <v-checkbox
-          v-for="col in columns"
-          :key="col.key"
-          v-model="selectedColumns"
-          :value="col.key"
-          :label="col.label"
-          density="compact"
-          hide-details
-          color="primary"
-          :data-test="`col-${col.key}`"
-        />
-      </div>
+  <div v-if="metadata" class="h-100 d-flex flex-column">
+    <div class="d-flex justify-end mb-2">
+      <v-menu :close-on-content-click="false">
+        <template v-slot:activator="{ props }">
+          <v-btn
+            color="secondary"
+            variant="text"
+            prepend-icon="mdi-table-cog"
+            v-bind="props"
+            size="small"
+          >
+            Columns
+          </v-btn>
+        </template>
+        <v-card min-width="200" max-height="400" class="overflow-y-auto pa-2">
+          <v-checkbox
+            v-for="col in columns"
+            :key="col.key"
+            v-model="selectedColumns"
+            :value="col.key"
+            :label="col.label"
+            density="compact"
+            hide-details
+            color="primary"
+          />
+        </v-card>
+      </v-menu>
     </div>
 
-    <div class="table-wrapper" v-if="hotels.length">
-      <table>
-        <thead>
-          <tr>
-            <th
-              v-for="col in columns"
-              :key="col.key"
-              v-show="selectedColumns.includes(col.key)"
-              :class="{ sortable: col.sortable }"
-              @click="col.sortable && col.sortKey ? toggleSort(col.sortKey) : null"
-            >
-              <div class="th-content">
-                {{ col.label }}
-                <v-icon
-                  v-if="col.sortable && col.sortKey"
-                  :icon="getSortIcon(col.sortKey)"
+    <v-card class="flex-grow-1 table-card" elevation="1">
+      <div class="table-wrapper" v-if="hotels.length">
+        <table>
+          <thead>
+            <tr>
+              <th
+                v-for="col in columns"
+                :key="col.key"
+                v-show="selectedColumns.includes(col.key)"
+                :class="{ sortable: col.sortable }"
+                @click="col.sortable && col.sortKey ? toggleSort(col.sortKey) : null"
+              >
+                <div class="th-content">
+                  {{ col.label }}
+                  <v-icon
+                    v-if="col.sortable && col.sortKey"
+                    :icon="getSortIcon(col.sortKey)"
+                    size="small"
+                    class="sort-icon"
+                  />
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="hotel in hotels" :key="hotel.id" data-test="hotel-row">
+              <td v-if="selectedColumns.includes('name')" class="col-name">
+                <div class="hotel-name">{{ hotel.name }}</div>
+                <div class="hotel-city">{{ hotel.city }}</div>
+              </td>
+              <td v-if="selectedColumns.includes('stars')" class="col-stars">
+                <v-rating
+                  :model-value="hotel.stars ?? 0"
+                  color="amber"
+                  density="compact"
                   size="small"
-                  class="sort-icon"
+                  readonly
+                  half-increments
                 />
-              </div>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="hotel in hotels" :key="hotel.id" data-test="hotel-row">
-            <td v-if="selectedColumns.includes('name')" class="col-name">
-              <div class="hotel-name">{{ hotel.name }}</div>
-              <div class="hotel-city">{{ hotel.city }}</div>
-            </td>
-            <td v-if="selectedColumns.includes('stars')" class="col-stars">
-              <v-rating
-                :model-value="hotel.stars ?? 0"
-                color="amber"
-                density="compact"
-                size="small"
-                readonly
-                half-increments
-              />
-            </td>
-            <td v-if="selectedColumns.includes('rating')" class="col-rating">
-              <div class="rating-badge" v-if="hotel.google_rating">
-                {{ hotel.google_rating }}
-              </div>
-              <span v-else class="muted">-</span>
-            </td>
-            <td v-if="selectedColumns.includes('reviews')" class="col-reviews">
-              {{ hotel.review_count }}
-            </td>
-            <td v-if="selectedColumns.includes('price_min')" class="col-price">
-              <div class="price-main">
-                {{ formatCurrency(hotel.price_range.min) }}
-              </div>
-              <div class="price-sub" v-if="hotel.price_range.min !== hotel.price_range.max">
-                - {{ formatCurrency(hotel.price_range.max) }}
-              </div>
-            </td>
-            <td v-if="selectedColumns.includes('air_transat')">
-              <a
-                v-if="hotel.air_transat_url"
-                :href="hotel.air_transat_url"
-                target="_blank"
-                class="icon-link"
-              >
-                <v-icon icon="mdi-airplane" color="primary" />
-              </a>
-            </td>
-            <td v-if="selectedColumns.includes('google_maps')">
-              <a :href="getGoogleMapsUrl(hotel)" target="_blank" class="icon-link">
-                <v-icon icon="mdi-map-marker" color="secondary" />
-              </a>
-            </td>
-            <td v-if="selectedColumns.includes('summary')" class="col-summary">
-              <div v-if="hasReviewSummary(hotel)">
-                <v-btn
-                  size="small"
-                  variant="tonal"
-                  color="primary"
-                  prepend-icon="mdi-robot"
-                  @click="openSummary(hotel)"
-                  data-test="ai-summary-btn"
+              </td>
+              <td v-if="selectedColumns.includes('rating')" class="col-rating">
+                <div class="rating-badge" v-if="hotel.google_rating">
+                  {{ hotel.google_rating }}
+                </div>
+                <span v-else class="muted">-</span>
+              </td>
+              <td v-if="selectedColumns.includes('reviews')" class="col-reviews">
+                {{ hotel.review_count }}
+              </td>
+              <td v-if="selectedColumns.includes('price_min')" class="col-price">
+                <div class="price-main">
+                  {{ formatCurrency(hotel.price_range.min) }}
+                </div>
+                <div class="price-sub" v-if="hotel.price_range.min !== hotel.price_range.max">
+                  - {{ formatCurrency(hotel.price_range.max) }}
+                </div>
+              </td>
+              <td v-if="selectedColumns.includes('air_transat')">
+                <a
+                  v-if="hotel.air_transat_url"
+                  :href="hotel.air_transat_url"
+                  target="_blank"
+                  class="icon-link"
                 >
-                  View Summary
-                </v-btn>
-              </div>
-              <span
-                v-else
-                class="wip-pill"
-                aria-label="AI summary in progress"
-                data-test="summary-wip"
-              >
-                ⏳ WIP
-              </span>
-            </td>
-            <td v-if="selectedColumns.includes('adult_only')">
-              <v-icon
-                v-if="hotel.adult_only"
-                icon="mdi-account-off"
-                color="grey-darken-1"
-                title="Adults Only"
-              />
-            </td>
-            <td v-if="selectedColumns.includes('packages')">
-              {{ hotel.package_count }}
-            </td>
-            <td v-if="selectedColumns.includes('drinks24h')">
-              <v-icon v-if="hotel.drinks24h" icon="mdi-glass-cocktail" color="success" />
-            </td>
-            <td v-if="selectedColumns.includes('snacks24h')">
-              <v-icon v-if="hotel.snacks24h" icon="mdi-food" color="success" />
-            </td>
-            <td v-if="selectedColumns.includes('restaurants')">
-              {{ hotel.number_of_restaurants }}
-            </td>
-            <td v-if="selectedColumns.includes('spa')">
-              <v-icon
-                v-if="hotel.spa_available"
-                icon="mdi-spa"
-                color="purple-lighten-2"
-              />
-            </td>
-            <td v-if="selectedColumns.includes('meal_plan')">
-              <span class="badge" v-if="hotel.meal_plan_code">{{ hotel.meal_plan_code }}</span>
-            </td>
-            <td v-if="selectedColumns.includes('thumbnail')">
-              <img
-                v-if="hotel.thumbnail_url"
-                :src="hotel.thumbnail_url"
-                class="hotel-thumb"
-                loading="lazy"
-              />
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div v-else class="empty-state">
-      <v-icon icon="mdi-magnify-remove-outline" size="64" color="grey-lighten-1" />
-      <h3>No hotels found</h3>
-      <p>Try adjusting your filters</p>
-    </div>
+                  <v-icon icon="mdi-airplane" color="primary" />
+                </a>
+              </td>
+              <td v-if="selectedColumns.includes('google_maps')">
+                <a :href="getGoogleMapsUrl(hotel)" target="_blank" class="icon-link">
+                  <v-icon icon="mdi-map-marker" color="secondary" />
+                </a>
+              </td>
+              <td v-if="selectedColumns.includes('summary')" class="col-summary">
+                <div v-if="hasReviewSummary(hotel)">
+                  <v-btn
+                    size="small"
+                    variant="tonal"
+                    color="primary"
+                    prepend-icon="mdi-robot"
+                    @click="openSummary(hotel)"
+                    data-test="ai-summary-btn"
+                  >
+                    View Summary
+                  </v-btn>
+                </div>
+                <span
+                  v-else
+                  class="wip-pill"
+                  aria-label="AI summary in progress"
+                  data-test="summary-wip"
+                >
+                  ⏳ WIP
+                </span>
+              </td>
+              <td v-if="selectedColumns.includes('adult_only')">
+                <v-icon
+                  v-if="hotel.adult_only"
+                  icon="mdi-account-off"
+                  color="grey-darken-1"
+                  title="Adults Only"
+                />
+              </td>
+              <td v-if="selectedColumns.includes('packages')">
+                {{ hotel.package_count }}
+              </td>
+              <td v-if="selectedColumns.includes('drinks24h')">
+                <v-icon v-if="hotel.drinks24h" icon="mdi-glass-cocktail" color="success" />
+              </td>
+              <td v-if="selectedColumns.includes('snacks24h')">
+                <v-icon v-if="hotel.snacks24h" icon="mdi-food" color="success" />
+              </td>
+              <td v-if="selectedColumns.includes('restaurants')">
+                {{ hotel.number_of_restaurants }}
+              </td>
+              <td v-if="selectedColumns.includes('spa')">
+                <v-icon
+                  v-if="hotel.spa_available"
+                  icon="mdi-spa"
+                  color="purple-lighten-2"
+                />
+              </td>
+              <td v-if="selectedColumns.includes('meal_plan')">
+                <span class="badge" v-if="hotel.meal_plan_code">{{ hotel.meal_plan_code }}</span>
+              </td>
+              <td v-if="selectedColumns.includes('thumbnail')">
+                <img
+                  v-if="hotel.thumbnail_url"
+                  :src="hotel.thumbnail_url"
+                  class="hotel-thumb"
+                  loading="lazy"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-else class="empty-state">
+        <v-icon icon="mdi-magnify-remove-outline" size="64" color="grey-lighten-1" />
+        <h3>No hotels found</h3>
+        <p>Try adjusting your filters</p>
+      </div>
+    </v-card>
 
     <v-dialog v-model="summaryDialogVisible" max-width="700">
       <v-card v-if="selectedSummaryHotel && hasReviewSummary(selectedSummaryHotel)">
@@ -294,36 +307,20 @@ const openSummary = (hotel: WebHotel) => {
         </v-card-text>
       </v-card>
     </v-dialog>
-  </section>
+  </div>
 </template>
 
 <style scoped>
 .table-card {
   background: white;
   overflow: hidden;
-}
-
-.column-chooser {
-  padding: 1rem;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.checkbox-label {
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  font-size: 0.875rem;
-  color: #444;
-}
-
-.column-chooser__options {
   display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
+  flex-direction: column;
 }
 
 .table-wrapper {
   overflow-x: auto;
+  flex-grow: 1;
 }
 
 table {
@@ -340,6 +337,9 @@ th {
   font-weight: 600;
   border-bottom: 2px solid #e0e0e0;
   white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 th.sortable {
@@ -411,39 +411,6 @@ tr:hover td {
 .col-summary {
   min-width: 250px;
   max-width: 400px;
-}
-
-.summary-text {
-  margin: 0 0 0.5rem 0;
-  line-height: 1.4;
-  color: #444;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.summary-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.tag {
-  font-size: 0.7rem;
-  padding: 2px 6px;
-  border-radius: 12px;
-  background: #eee;
-}
-
-.tag--good {
-  background: #e8f5e9;
-  color: #2e7d32;
-}
-
-.tag--bad {
-  background: #ffebee;
-  color: #c62828;
 }
 
 .hotel-thumb {
