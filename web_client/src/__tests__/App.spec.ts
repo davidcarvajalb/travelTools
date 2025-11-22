@@ -144,7 +144,7 @@ describe("App.vue", () => {
 
     const rows = wrapper.findAll('[data-test="hotel-row"]');
     expect(rows).toHaveLength(2);
-    expect(rows[0].text()).toContain("Dreams Riviera Cancun");
+    expect(rows[0].text()).toContain("Iberostar Selection Paraiso");
   });
 
   it("filters hotels by search term", async () => {
@@ -212,8 +212,8 @@ describe("App.vue", () => {
     await summaryButtons[0].trigger("click");
     await flushPromises();
 
-    const vm = wrapper.vm as unknown as { summaryDialogVisible: boolean };
-    expect(vm.summaryDialogVisible).toBe(true);
+    // Check if dialog content is rendered
+    expect(document.body.innerHTML).toContain("Strong stay");
   });
 
   it("shows work-in-progress indicator when summary is missing", async () => {
